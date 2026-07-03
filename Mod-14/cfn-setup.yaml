@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 14 Demo Setup - Cost Reporting, Alerts and Optimization'
+
+Parameters:
+  AlertEmail:
+    Type: String
+    Default: your-email@example.com
+    Description: Email for budget and billing alerts
+
+Resources:
+  CostAlertTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: demo-cost-alerts
+      Subscription:
+        - Protocol: email
+          Endpoint: !Ref AlertEmail
+
+  CostAlertTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      Topics: [!Ref CostAlertTopic]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - budgets.amazonaws.com
+                - cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref CostAlertTopic
+
+Outputs:
+  SNSTopicArn:
+    Value: !Ref CostAlertTopic
+    Description: SNS topic for cost alerts
+  SNSTopicName:
+    Value: !GetAtt CostAlertTopic.TopicName

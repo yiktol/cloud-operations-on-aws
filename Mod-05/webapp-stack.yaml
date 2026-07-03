@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Demo - Web application stack (used in Module 05 live demo)'
+
+Parameters:
+  EnvironmentType:
+    Type: String
+    Default: Development
+    AllowedValues: [Development, Production]
+    Description: Select environment type
+
+Conditions:
+  IsProduction: !Equals [!Ref EnvironmentType, Production]
+
+Mappings:
+  InstanceTypeMap:
+    Development: {InstanceType: t3.micro}
+    Production:  {InstanceType: t3.small}
+
+Resources:
+  DemoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentType}-VPC'
+
+  DemoSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+
+  DemoSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP
+      VpcId: !Ref DemoVPC
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub >-
+        {{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}
+      InstanceType: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
+      SubnetId: !Ref DemoSubnet
+      SecurityGroupIds: [!Ref DemoSG]
+      Tags:
+        - Key: Name
+          Value: !Sub '${EnvironmentType}-WebServer'
+        - Key: Environment
+          Value: !Ref EnvironmentType
+
+Outputs:
+  VPCId:
+    Value: !Ref DemoVPC
+  InstanceId:
+    Value: !Ref DemoInstance
+  InstanceType:
+    Value: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
+    Description: Instance type deployed

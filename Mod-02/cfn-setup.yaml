@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 02 Demo Setup - Access Management'
+
+Resources:
+  GeneralBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'general-demo-${AWS::AccountId}'
+
+  ConfidentialBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'confidential-demo-${AWS::AccountId}'
+
+  AllowS3ReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowS3Read-Demo
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: [s3:GetObject, s3:ListBucket, s3:ListAllMyBuckets]
+            Resource: '*'
+
+  DenyConfidentialPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: DenyConfidentialBucket-Demo
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Action: 's3:*'
+            Resource:
+              - !GetAtt ConfidentialBucket.Arn
+              - !Sub '${ConfidentialBucket.Arn}/*'
+
+  AllowAssumeRolePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: AllowAssumeEmergencyRole-Demo
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action: sts:AssumeRole
+            Resource: !GetAtt EmergencyAdminRole.Arn
+
+  DemoUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: demo-user
+
+  DemoUserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref DemoUser
+
+  EmergencyAdminRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EmergencyAdminRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !GetAtt DemoUser.Arn
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+Outputs:
+  DemoUserAccessKeyId:
+    Value: !Ref DemoUserAccessKey
+  DemoUserSecretKey:
+    Value: !GetAtt DemoUserAccessKey.SecretAccessKey
+  GeneralBucketName:
+    Value: !Ref GeneralBucket
+  ConfidentialBucketName:
+    Value: !Ref ConfidentialBucket
+  AllowS3ReadPolicyArn:
+    Value: !Ref AllowS3ReadPolicy
+  DenyConfidentialPolicyArn:
+    Value: !Ref DenyConfidentialPolicy
+  AllowAssumeRolePolicyArn:
+    Value: !Ref AllowAssumeRolePolicy
+  EmergencyAdminRoleArn:
+    Value: !GetAtt EmergencyAdminRole.Arn

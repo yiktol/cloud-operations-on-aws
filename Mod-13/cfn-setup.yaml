@@ -1,0 +1,16 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 13 Demo Setup - Object Storage (Amazon S3)'
+
+Resources:
+  DemoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 's3-lifecycle-demo-${AWS::AccountId}'
+      Tags:
+        - Key: Purpose
+          Value: Module13-Demo
+
+Outputs:
+  BucketName:
+    Value: !Ref DemoBucket
+    Description: S3 bucket for lifecycle and versioning demos

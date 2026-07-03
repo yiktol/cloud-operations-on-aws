@@ -1,0 +1,17 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 05 Demo Setup - Automate Resource Deployment (CloudFormation IaC)'
+
+# Note: This stack creates the nested webapp-stack.yaml template in an S3 bucket
+# so it's ready to deploy during the live demo.
+
+Resources:
+
+  TemplateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'cfn-templates-demo-${AWS::AccountId}'
+
+Outputs:
+  TemplateBucketName:
+    Value: !Ref TemplateBucket
+    Description: S3 bucket for storing demo CloudFormation templates

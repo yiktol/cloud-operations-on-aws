@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 12 Demo Setup - Mountable Storage (EBS, EFS, AWS Backup)'
+
+Resources:
+  StorageRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod12-Storage-InstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Mod12-Storage-InstanceProfile
+      Roles: [!Ref StorageRole]
+
+  DemoSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: mod12-demo-sg
+      GroupDescription: Module 12 storage demo
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub >-
+        {{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref InstanceProfile
+      SecurityGroupIds: [!Ref DemoSG]
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Tags:
+        - {Key: Name, Value: Mod12-Demo-Instance}
+        - {Key: Backup, Value: 'true'}
+
+  DemoVolume:
+    Type: AWS::EC2::Volume
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs '']
+      Size: 10
+      VolumeType: gp3
+      Iops: 3000
+      Throughput: 125
+      Tags:
+        - {Key: Name, Value: Mod12-Demo-Volume}
+        - {Key: Backup, Value: 'true'}
+
+  BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod12-Backup-ServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: backup.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
+
+Outputs:
+  InstanceId:
+    Value: !Ref DemoInstance
+  VolumeId:
+    Value: !Ref DemoVolume
+  InstanceAZ:
+    Value: !Select [0, !GetAZs '']
+  BackupRoleArn:
+    Value: !GetAtt BackupRole.Arn

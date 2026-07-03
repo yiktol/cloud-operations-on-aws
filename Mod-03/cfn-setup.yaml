@@ -1,0 +1,51 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 03 Demo Setup - System Discovery (Session Manager, SSM Inventory, AWS Config)'
+
+Resources:
+
+  DemoInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod03-DemoInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Mod03-DemoInstanceProfile
+      Roles: [!Ref DemoInstanceRole]
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref DemoInstanceProfile
+      Tags:
+        - Key: Name
+          Value: Mod03-DemoInstance
+        - Key: Environment
+          Value: Demo
+
+  ConfigBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'config-demo-${AWS::AccountId}'
+
+  ConfigServiceRole:
+    Type: AWS::IAM::ServiceLinkedRole
+    Properties:
+      AWSServiceName: config.amazonaws.com
+
+Outputs:
+  InstanceId:
+    Value: !Ref DemoInstance
+  ConfigBucketName:
+    Value: !Ref ConfigBucket

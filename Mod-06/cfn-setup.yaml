@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 06 Demo Setup - Manage Resources (Run Command, Parameter Store, Maintenance Windows)'
+
+Resources:
+
+  DemoInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod06-DemoInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Mod06-DemoInstanceProfile
+      Roles: [!Ref DemoInstanceRole]
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref DemoInstanceProfile
+      Tags:
+        - Key: Name
+          Value: Mod06-DemoInstance
+        - Key: Environment
+          Value: Production
+        - Key: PatchGroup
+          Value: Production-Linux
+
+Outputs:
+  InstanceId:
+    Value: !Ref DemoInstance
+

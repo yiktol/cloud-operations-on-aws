@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 08 Demo Setup - Automate Scaling (EC2 Auto Scaling, Launch Templates)'
+
+Resources:
+
+  DemoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      Tags: [{Key: Name, Value: Mod08-DemoVPC}]
+
+  SubnetAZ1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+
+  SubnetAZ2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DemoVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: true
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+  IGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: {VpcId: !Ref DemoVPC, InternetGatewayId: !Ref IGW}
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties: {VpcId: !Ref DemoVPC}
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: IGWAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+  RTAssoc1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref SubnetAZ1, RouteTableId: !Ref RouteTable}
+  RTAssoc2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties: {SubnetId: !Ref SubnetAZ2, RouteTableId: !Ref RouteTable}
+
+  ASGInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod08-ASGInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  ASGInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Mod08-ASGInstanceProfile
+      Roles: [!Ref ASGInstanceRole]
+
+  DemoSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ASG demo
+      VpcId: !Ref DemoVPC
+      SecurityGroupIngress:
+        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+
+Outputs:
+  VPCId: {Value: !Ref DemoVPC}
+  SubnetAZ1Id: {Value: !Ref SubnetAZ1}
+  SubnetAZ2Id: {Value: !Ref SubnetAZ2}
+  SGId: {Value: !Ref DemoSG}
+  InstanceProfileArn: {Value: !GetAtt ASGInstanceProfile.Arn}
+

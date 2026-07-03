@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 04 Demo Setup - Deploy and Update Resources (Tagging, Golden AMI)'
+
+Resources:
+
+  DemoInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod04-DemoInstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ec2.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  DemoInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: Mod04-DemoInstanceProfile
+      Roles: [!Ref DemoInstanceRole]
+
+  DemoInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      InstanceType: t3.micro
+      IamInstanceProfile: !Ref DemoInstanceProfile
+      Tags:
+        - Key: Name
+          Value: WebServer-Base
+        - Key: Environment
+          Value: Development
+        - Key: CostCenter
+          Value: CC1234
+
+Outputs:
+  InstanceId:
+    Value: !Ref DemoInstance
