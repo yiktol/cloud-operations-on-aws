@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Graphviz portable installation
+graphviz/
+
+# AWS icons (large binary assets)
+aws-icons/

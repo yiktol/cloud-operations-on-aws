@@ -1,0 +1,23 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Module 01 Demo Setup - Well-Architected workload for Cloud Operations intro'
+
+Resources:
+  DemoWorkload:
+    Type: AWS::WellArchitected::Workload
+    Properties:
+      WorkloadName: ExampleCorp-CustomerPortal
+      Description: Customer-facing portal migrating to AWS (Module 01 demo)
+      Environment: PRODUCTION
+      ReviewOwner: CloudOps Team
+      Lenses:
+        - wellarchitected
+      AwsRegions:
+        - !Ref AWS::Region
+
+Outputs:
+  WorkloadId:
+    Value: !GetAtt DemoWorkload.WorkloadId
+    Description: The Well-Architected Workload ID
+  WorkloadArn:
+    Value: !GetAtt DemoWorkload.WorkloadArn
+    Description: The Well-Architected Workload ARN
