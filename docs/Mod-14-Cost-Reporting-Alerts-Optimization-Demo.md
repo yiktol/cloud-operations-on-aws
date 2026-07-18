@@ -27,7 +27,7 @@ Each act pairs live CLI commands with instructor talking points tied directly to
 | AWS CLI version | v2.x (`aws --version`) |
 | IAM permissions | `billing:*`, `budgets:*`, `ce:*`, `cloudwatch:*`, `trustedadvisor:*`, `compute-optimizer:*` |
 | IAM Billing Access | Billing console access must be **activated** in Account Settings for IAM users |
-| AWS Region | Most commands target `us-east-1` (billing metrics are stored only in us-east-1) |
+| AWS Region | Default `ap-southeast-1`; billing alarm commands target `us-east-1` (billing metrics are stored only in us-east-1) |
 | Billing Alerts | Must be enabled in **Billing Preferences** before billing alarms work |
 | SNS Topic | A pre-created SNS topic with a confirmed email subscription for alert demos |
 | Compute Optimizer | Opt-in must be done ≥24 hours before class for data to populate |
@@ -42,7 +42,7 @@ Each act pairs live CLI commands with instructor talking points tied directly to
 
 ```bash
 # Set default profile/region for the demo session
-export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_REGION=ap-southeast-1
 aws configure get region
 ```
 

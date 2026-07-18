@@ -13,7 +13,7 @@
 |---|---|
 | AWS CLI version | 2.x (`aws --version`) |
 | IAM permissions | `ec2:*`, `elasticfilesystem:*`, `backup:*`, `cloudwatch:GetMetricStatistics` |
-| Region | `us-east-1` (or set `AWS_DEFAULT_REGION`) |
+| Region | `ap-southeast-1` (or set `AWS_DEFAULT_REGION`) |
 | Running EC2 instance | At least one instance to demonstrate attach/detach |
 | AWS CLI profile | Configured with `aws configure` or an instance profile |
 
@@ -27,8 +27,8 @@
 
 ```bash
 # ── 0. Set environment variables ────────────────────────────────────────────
-export AWS_DEFAULT_REGION="us-east-1"
-export AZ="us-east-1a"
+export AWS_DEFAULT_REGION="ap-southeast-1"
+export AZ="ap-southeast-1a"
 
 # Get a running instance ID (pick the first one in the AZ, or hard-code yours)
 export INSTANCE_ID=$(aws ec2 describe-instances \
@@ -80,7 +80,7 @@ echo "Volume is available."
 >
 > *"There are six EBS volume types grouped into SSDs — gp2, gp3, io1, io2 — and HDDs — st1 and sc1. The best choice depends on whether your bottleneck is IOPS or throughput."*
 >
-> *"A critical rule: EBS volumes are tied to a single Availability Zone. If your instance is in us-east-1a, your volume must also be in us-east-1a."*
+> *"A critical rule: EBS volumes are tied to a single Availability Zone. If your instance is in ap-southeast-1a, your volume must also be in ap-southeast-1a."*
 
 #### Commands
 

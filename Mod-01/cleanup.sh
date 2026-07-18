@@ -1,22 +1,23 @@
 #!/bin/bash
 # Module 01 - Cleanup
 set -e
-STACK_NAME="mod01-cloud-operations-demo"
 
 echo "[CLEANUP] Module 01 Demo..."
 
-# If a workload was created LIVE (not via CFN), clean it up too
-LIVE_WORKLOAD=$(aws wellarchitected list-workloads \
-  --query 'WorkloadSummaries[?WorkloadName==`ExampleCorp-CustomerPortal`].WorkloadId' \
-  --output text 2>/dev/null)
+WORKLOAD_NAME="Online-Store-Production"
 
-# Delete the stack (removes the CFN-managed workload)
-aws cloudformation delete-stack --stack-name ${STACK_NAME}
-aws cloudformation wait stack-delete-complete --stack-name ${STACK_NAME} 2>/dev/null || true
+# Find and delete the workload
+WORKLOAD_IDS=$(aws wellarchitected list-workloads \
+  --query "WorkloadSummaries[?WorkloadName=='${WORKLOAD_NAME}'].WorkloadId" \
+  --output text 2>/dev/null || true)
 
-# Clean up any duplicate live-created workload not managed by CFN
-for WID in ${LIVE_WORKLOAD}; do
-  aws wellarchitected delete-workload --workload-id ${WID} 2>/dev/null || true
-done
+if [ -z "$WORKLOAD_IDS" ] || [ "$WORKLOAD_IDS" = "None" ]; then
+  echo "[SKIP] No workload found to delete."
+else
+  for WID in ${WORKLOAD_IDS}; do
+    aws wellarchitected delete-workload --workload-id "${WID}"
+    echo "[DELETED] Workload: ${WID}"
+  done
+fi
 
 echo "[DONE] Cleanup complete!"

@@ -29,17 +29,17 @@ bash Mod-01/deploy.sh
 
 ### 🎬 Act 1: Define a Workload
 
-> **Say:** "The Well-Architected Framework isn't just theory — AWS gives us a free tool to measure any workload against the six pillars. Let's define our Example Corp. application as a workload."
+> **Say:** "The Well-Architected Framework isn't just theory — AWS gives us a free tool to measure any workload against the six pillars. Let's define our production online store as a workload."
 
 ```bash
 # Create a workload
 WORKLOAD_ID=$(aws wellarchitected create-workload \
-  --workload-name "ExampleCorp-CustomerPortal" \
-  --description "Customer-facing portal migrating to AWS" \
+  --workload-name "Online-Store-Production" \
+  --description "Production e-commerce platform — web tier, API, database, and CDN" \
   --environment PRODUCTION \
-  --reviewer-name "CloudOps Team" \
+  --review-owner "CloudOps Team" \
   --lenses "wellarchitected" \
-  --aws-regions "us-east-1" \
+  --aws-regions "ap-southeast-1" \
   --query WorkloadId --output text)
 
 echo "Workload created: ${WORKLOAD_ID}"
