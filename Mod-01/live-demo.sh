@@ -1,16 +1,10 @@
 #!/bin/bash
-# Module 01 - Live Demo: "Review Your Workload with the Well-Architected Tool"
-# Interactive - uses read prompts between acts
+# Module 01 - Live Demo: Review Your Workload with the Well-Architected Tool
 
 REGION=$(aws configure get region)
 
-echo "============================================"
-echo "  ACT 1: DEFINE A WORKLOAD"
-echo "============================================"
-echo ""
-echo ">> Creating the Example Corp. Customer Portal workload..."
-read -p "Press Enter..."
-
+# --- ACT 1: Define a Workload ---
+# Create the Example Corp Customer Portal workload
 WORKLOAD_ID=$(aws wellarchitected create-workload \
   --workload-name "ExampleCorp-CustomerPortal-Live" \
   --description "Customer-facing portal migrating to AWS" \
@@ -20,19 +14,13 @@ WORKLOAD_ID=$(aws wellarchitected create-workload \
   --aws-regions "${REGION}" \
   --query WorkloadId --output text)
 
-echo "Workload created: ${WORKLOAD_ID}"
+# Show workload details
 aws wellarchitected get-workload --workload-id ${WORKLOAD_ID} \
   --query 'Workload.{Name:WorkloadName,Environment:Environment,Lenses:Lenses}' \
   --output table
-echo ""
-echo ">> A workload = the application plus all its resources."
-echo ""
 
-echo "============================================"
-echo "  ACT 2: REVIEW THE PILLARS"
-echo "============================================"
-read -p "Press Enter to view Operational Excellence questions..."
-
+# --- ACT 2: Review the Pillars ---
+# List Operational Excellence questions and risk levels
 aws wellarchitected list-answers \
   --workload-id ${WORKLOAD_ID} \
   --lens-alias wellarchitected \
@@ -40,44 +28,32 @@ aws wellarchitected list-answers \
   --query 'AnswerSummaries[*].{Question:QuestionTitle,Risk:Risk}' \
   --output table
 
-echo ""
-echo "The Six Pillars:"
-echo "  1. operationalExcellence   2. security       3. reliability"
-echo "  4. performance             5. costOptimization  6. sustainability"
-echo ""
-
+# Get the first question ID
 QUESTION_ID=$(aws wellarchitected list-answers \
   --workload-id ${WORKLOAD_ID} \
   --lens-alias wellarchitected \
   --pillar-id operationalExcellence \
   --query 'AnswerSummaries[0].QuestionId' --output text)
 
-echo ">> Choices for the first question:"
+# Show choices for the first question
 aws wellarchitected get-answer \
   --workload-id ${WORKLOAD_ID} \
   --lens-alias wellarchitected \
   --question-id ${QUESTION_ID} \
   --query 'Answer.{Question:QuestionTitle,Choices:Choices[*].Title}' \
   --output json
-echo ""
 
-echo "============================================"
-echo "  ACT 3: RISK REPORT"
-echo "============================================"
-read -p "Press Enter to see the risk summary..."
-
-echo ">> Risk counts across all pillars:"
+# --- ACT 3: Risk Report ---
+# Show risk counts across all pillars
 aws wellarchitected get-workload --workload-id ${WORKLOAD_ID} \
   --query 'Workload.RiskCounts' --output table
 
-echo ""
-echo ">> Creating a milestone (snapshot to track improvement)..."
+# Create a milestone to track improvement over time
 aws wellarchitected create-milestone \
   --workload-id ${WORKLOAD_ID} \
-  --milestone-name "Initial-Review-$(date +%Y%m%d)" 2>/dev/null || echo "(Milestone needs at least one answered question)"
+  --milestone-name "Initial-Review-$(date +%Y%m%d)" 2>/dev/null || true
 
-echo ""
-echo ">> Medium/High risks in Operational Excellence:"
+# Show medium/high risks in Operational Excellence
 aws wellarchitected list-answers \
   --workload-id ${WORKLOAD_ID} \
   --lens-alias wellarchitected \
@@ -85,10 +61,5 @@ aws wellarchitected list-answers \
   --query 'AnswerSummaries[?Risk==`HIGH` || Risk==`MEDIUM`].{Question:QuestionTitle,Risk:Risk}' \
   --output table
 
-echo ""
-echo ">> RESULT: The framework becomes a prioritized action plan!"
-echo ""
-echo "Cleanup this live workload with:"
-echo "  aws wellarchitected delete-workload --workload-id ${WORKLOAD_ID}"
-echo ""
-echo "============ DEMO COMPLETE ============"
+# Cleanup
+# aws wellarchitected delete-workload --workload-id ${WORKLOAD_ID}

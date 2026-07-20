@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 04 Demo Setup - Deploy and Update Resources (Tagging, Golden AMI)'
 
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet with NAT Gateway access for SSM connectivity
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to create the security group in
+
 Resources:
 
   DemoInstanceRole:
@@ -22,12 +30,27 @@ Resources:
       InstanceProfileName: Mod04-DemoInstanceProfile
       Roles: [!Ref DemoInstanceRole]
 
+  DemoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Mod04 Demo - Outbound only (SSM access via NAT)
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Mod04-DemoSG
+
   DemoInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
       IamInstanceProfile: !Ref DemoInstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref DemoSecurityGroup
       Tags:
         - Key: Name
           Value: WebServer-Base
@@ -39,3 +62,11 @@ Resources:
 Outputs:
   InstanceId:
     Value: !Ref DemoInstance
+  InstanceProfileArn:
+    Value: !GetAtt DemoInstanceProfile.Arn
+  InstanceProfileName:
+    Value: !Ref DemoInstanceProfile
+  SecurityGroupId:
+    Value: !Ref DemoSecurityGroup
+  SubnetId:
+    Value: !Ref SubnetId

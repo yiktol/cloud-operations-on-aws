@@ -1,66 +1,84 @@
 #!/bin/bash
 # Module 04 - Live Demo: Tag, Image, Deploy
-# Prereq: Run deploy.sh first.
+# Prereq: Run deploy.sh first
+set -e
 
 STACK_NAME="mod04-deploy-update-demo"
 if [ -z "$INSTANCE_ID" ]; then
   INSTANCE_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
     --query 'Stacks[0].Outputs[?OutputKey==`InstanceId`].OutputValue' --output text)
 fi
-echo "Instance: ${INSTANCE_ID}"
+
+# Get networking details from stack outputs for launching new instances
+SUBNET_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
+  --query 'Stacks[0].Outputs[?OutputKey==`SubnetId`].OutputValue' --output text)
+SG_ID=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
+  --query 'Stacks[0].Outputs[?OutputKey==`SecurityGroupId`].OutputValue' --output text)
+PROFILE_NAME=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
+  --query 'Stacks[0].Outputs[?OutputKey==`InstanceProfileName`].OutputValue' --output text)
+
+echo "========================================"
+echo " Module 04: Deploy and Update Resources"
+echo " Instance: ${INSTANCE_ID}"
+echo "========================================"
 echo ""
 
-echo "============================================"
-echo "  ACT 1: TAGGING STRATEGY"
-echo "============================================"
+# --- ACT 1: Tagging Strategy ---
+echo "--- ACT 1: Tagging Strategy (Resource Organization) ---"
 echo ""
-echo ">> Show current tags on the instance..."
-read -p "Press Enter..."
+
+# Show current tags on the instance
+echo "[1.1] Current tags on the base instance:"
 aws ec2 describe-tags \
   --filters "Name=resource-id,Values=${INSTANCE_ID}" \
+  --query 'Tags[*].{Key:Key,Value:Value}' \
   --output table
-
 echo ""
-echo ">> Add operational tags (owner, application, patch group)..."
-read -p "Press Enter..."
+
+# Add operational tags (owner, application, patch group)
+echo "[1.2] Adding operational tags..."
 aws ec2 create-tags --resources ${INSTANCE_ID} --tags \
   Key=Application,Value=CustomerPortal \
   Key=Owner,Value=TeamAlpha \
   Key=PatchGroup,Value=Production-Linux
-
+echo "  ✓ Tags added: Application, Owner, PatchGroup"
 echo ""
-echo ">> Find all Development resources by tag..."
+
+# Find all Development resources by tag
+echo "[1.3] Resources tagged Environment=Development:"
 aws resourcegroupstaggingapi get-resources \
   --tag-filters Key=Environment,Values=Development \
   --query 'ResourceTagMappingList[*].{ARN:ResourceARN}' --output table
-
 echo ""
-echo ">> Create a Resource Group..."
+
+# Create a Resource Group based on tags
+echo "[1.4] Creating Resource Group 'Dev-Environment'..."
 aws resource-groups create-group \
   --name "Dev-Environment" \
   --resource-query '{
     "Type":"TAG_FILTERS_1_0",
     "Query":"{\"ResourceTypeFilters\":[\"AWS::AllSupported\"],\"TagFilters\":[{\"Key\":\"Environment\",\"Values\":[\"Development\"]}]}"
-  }' 2>/dev/null || echo "  Resource group already exists."
-
-echo ""
-echo ">> RESULT: Tags = visibility for cost, automation, and access control."
+  }' --query 'Group.{Name:Name,ARN:GroupArn}' --output table 2>/dev/null || echo "  (Group already exists)"
 echo ""
 
-echo "============================================"
-echo "  ACT 2: CREATE A GOLDEN AMI"
-echo "============================================"
-read -p "Press Enter..."
+# --- ACT 2: Create a Golden AMI ---
+echo "--- ACT 2: Create a Golden AMI ---"
+echo ""
 
-echo ">> Verify httpd is installed on the base instance..."
-aws ssm send-command \
+# Verify httpd is installed on the base instance
+echo "[2.1] Verifying httpd is installed:"
+CMD_ID=$(aws ssm send-command \
   --instance-ids ${INSTANCE_ID} \
   --document-name "AWS-RunShellScript" \
   --parameters 'commands=["systemctl status httpd | head -3"]' \
-  --query Command.CommandId --output text
-
+  --query Command.CommandId --output text)
+sleep 5
+aws ssm get-command-invocation --command-id ${CMD_ID} --instance-id ${INSTANCE_ID} \
+  --query 'StandardOutputContent' --output text
 echo ""
-echo ">> Creating AMI from the instance..."
+
+# Create AMI from the instance
+echo "[2.2] Creating Golden AMI..."
 AMI_ID=$(aws ec2 create-image \
   --instance-id ${INSTANCE_ID} \
   --name "GoldenAMI-WebServer-$(date +%Y%m%d)" \
@@ -68,36 +86,38 @@ AMI_ID=$(aws ec2 create-image \
   --tag-specifications 'ResourceType=image,Tags=[{Key=Name,Value=GoldenAMI-WebServer},{Key=Version,Value=1.0}]' \
   --query ImageId --output text)
 echo "  AMI ID: ${AMI_ID}"
-
 echo ""
-echo ">> Check AMI state (will be pending then available)..."
+
+# Check AMI state
+echo "[2.3] AMI status:"
 aws ec2 describe-images --image-ids ${AMI_ID} \
   --query 'Images[0].{State:State,Name:Name,Created:CreationDate}' --output table
-
-echo ""
-echo ">> RESULT: Golden AMI captures known-good config - no drift possible."
 echo ""
 
-echo "============================================"
-echo "  ACT 3: DEPLOY FROM GOLDEN AMI"
-echo "============================================"
-read -p "Press Enter (waiting for AMI to be available)..."
+# --- ACT 3: Deploy from Golden AMI ---
+echo "--- ACT 3: Deploy from Golden AMI ---"
+echo ""
 
-# Wait for AMI
+# Wait for AMI to be available
+echo "[3.1] Waiting for AMI to become available..."
 aws ec2 wait image-available --image-ids ${AMI_ID}
-echo "  AMI is available!"
-
+echo "  ✓ AMI is available"
 echo ""
-echo ">> Launch 2 instances from the golden AMI..."
+
+# Launch 2 instances from the golden AMI
+echo "[3.2] Launching 2 instances from Golden AMI..."
 aws ec2 run-instances \
   --image-id ${AMI_ID} \
   --instance-type t3.micro \
   --count 2 \
+  --subnet-id ${SUBNET_ID} \
+  --security-group-ids ${SG_ID} \
+  --iam-instance-profile Name=${PROFILE_NAME} \
   --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=WebServer-FromAMI},{Key=Environment,Value=Production},{Key=DeployedFrom,Value=${AMI_ID}}]" \
   --query 'Instances[*].{Id:InstanceId,State:State.Name}' --output table
+echo ""
 
-echo ""
-echo ">> RESULT: Every instance is identical - no post-launch config needed."
-echo "   DeployedFrom tag creates a full audit trail back to the AMI."
-echo ""
-echo "============ DEMO COMPLETE ============"
+echo "========================================"
+echo " Demo Complete!"
+echo " Golden AMI: ${AMI_ID}"
+echo "========================================"

@@ -20,8 +20,8 @@ TOPIC_ARN=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
   --query 'Stacks[0].Outputs[?OutputKey==`SecurityAlertsTopicArn`].OutputValue' --output text)
 
 echo ""
-read -p "[SETUP] Enter your email to receive security alerts: " EMAIL
-aws sns subscribe --topic-arn ${TOPIC_ARN} --protocol email --notification-endpoint ${EMAIL}
-echo "  Check your email and confirm the subscription!"
-
-echo "[DONE] Setup complete! export TOPIC_ARN=${TOPIC_ARN}"
+echo "[DONE] Setup complete!"
+echo "  export TOPIC_ARN=${TOPIC_ARN}"
+echo ""
+echo "  (Optional) Subscribe to alerts:"
+echo "  aws sns subscribe --topic-arn ${TOPIC_ARN} --protocol email --notification-endpoint YOUR_EMAIL"

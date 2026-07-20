@@ -1,52 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 08 Demo Setup - Automate Scaling (EC2 Auto Scaling, Launch Templates)'
 
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the demo resources
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in AZ1 (for ASG instances)
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in AZ2 (for ASG instances)
+
 Resources:
-
-  DemoVPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      Tags: [{Key: Name, Value: Mod08-DemoVPC}]
-
-  SubnetAZ1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref DemoVPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: true
-
-  SubnetAZ2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref DemoVPC
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: true
-
-  IGW:
-    Type: AWS::EC2::InternetGateway
-  IGWAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties: {VpcId: !Ref DemoVPC, InternetGatewayId: !Ref IGW}
-
-  RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties: {VpcId: !Ref DemoVPC}
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: IGWAttachment
-    Properties:
-      RouteTableId: !Ref RouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref IGW
-  RTAssoc1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: {SubnetId: !Ref SubnetAZ1, RouteTableId: !Ref RouteTable}
-  RTAssoc2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: {SubnetId: !Ref SubnetAZ2, RouteTableId: !Ref RouteTable}
 
   ASGInstanceRole:
     Type: AWS::IAM::Role
@@ -67,18 +33,19 @@ Resources:
       InstanceProfileName: Mod08-ASGInstanceProfile
       Roles: [!Ref ASGInstanceRole]
 
-  DemoSG:
+  InstanceSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: ASG demo
-      VpcId: !Ref DemoVPC
-      SecurityGroupIngress:
-        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+      GroupDescription: Mod08 ASG instances - outbound only for SSM
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags: [{Key: Name, Value: Mod08-ASG-SG}]
 
 Outputs:
-  VPCId: {Value: !Ref DemoVPC}
-  SubnetAZ1Id: {Value: !Ref SubnetAZ1}
-  SubnetAZ2Id: {Value: !Ref SubnetAZ2}
-  SGId: {Value: !Ref DemoSG}
+  VPCId: {Value: !Ref VpcId}
+  PrivateSubnet1Id: {Value: !Ref PrivateSubnet1}
+  PrivateSubnet2Id: {Value: !Ref PrivateSubnet2}
+  SGId: {Value: !Ref InstanceSecurityGroup}
   InstanceProfileArn: {Value: !GetAtt ASGInstanceProfile.Arn}
-

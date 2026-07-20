@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 12 Demo Setup - Mountable Storage (EBS, EFS, AWS Backup)'
 
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet for the EC2 instance
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for security group
+
 Resources:
   StorageRole:
     Type: AWS::IAM::Role
@@ -24,21 +32,21 @@ Resources:
   DemoSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: mod12-demo-sg
-      GroupDescription: Module 12 storage demo
+      GroupDescription: Module 12 storage demo - outbound only
+      VpcId: !Ref VpcId
       SecurityGroupEgress:
         - IpProtocol: '-1'
           CidrIp: 0.0.0.0/0
+      Tags: [{Key: Name, Value: Mod12-DemoSG}]
 
   DemoInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Sub >-
-        {{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
       IamInstanceProfile: !Ref InstanceProfile
+      SubnetId: !Ref SubnetId
       SecurityGroupIds: [!Ref DemoSG]
-      AvailabilityZone: !Select [0, !GetAZs '']
       Tags:
         - {Key: Name, Value: Mod12-Demo-Instance}
         - {Key: Backup, Value: 'true'}
@@ -46,7 +54,7 @@ Resources:
   DemoVolume:
     Type: AWS::EC2::Volume
     Properties:
-      AvailabilityZone: !Select [0, !GetAZs '']
+      AvailabilityZone: !GetAtt DemoInstance.AvailabilityZone
       Size: 10
       VolumeType: gp3
       Iops: 3000
@@ -68,12 +76,27 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup
 
+  DLMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: Mod12-DLM-ServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: dlm.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSDataLifecycleManagerServiceRole
+
 Outputs:
   InstanceId:
     Value: !Ref DemoInstance
   VolumeId:
     Value: !Ref DemoVolume
   InstanceAZ:
-    Value: !Select [0, !GetAZs '']
+    Value: !GetAtt DemoInstance.AvailabilityZone
   BackupRoleArn:
     Value: !GetAtt BackupRole.Arn
+  DLMRoleArn:
+    Value: !GetAtt DLMRole.Arn

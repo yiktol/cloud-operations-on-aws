@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 03 Demo Setup - System Discovery (Session Manager, SSM Inventory, AWS Config)'
 
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet to launch the instance in (must have internet access for SSM)
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to create the security group in
+
 Resources:
 
   DemoInstanceRole:
@@ -22,12 +30,27 @@ Resources:
       InstanceProfileName: Mod03-DemoInstanceProfile
       Roles: [!Ref DemoInstanceRole]
 
+  DemoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Mod03 Demo - No inbound access (SSM only)
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Mod03-DemoSG
+
   DemoInstance:
     Type: AWS::EC2::Instance
     Properties:
       ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
       IamInstanceProfile: !Ref DemoInstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref DemoSecurityGroup
       Tags:
         - Key: Name
           Value: Mod03-DemoInstance
@@ -39,10 +62,32 @@ Resources:
     Properties:
       BucketName: !Sub 'config-demo-${AWS::AccountId}'
 
-  ConfigServiceRole:
-    Type: AWS::IAM::ServiceLinkedRole
+  ConfigBucketPolicy:
+    Type: AWS::S3::BucketPolicy
     Properties:
-      AWSServiceName: config.amazonaws.com
+      Bucket: !Ref ConfigBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AWSConfigBucketPermissionsCheck
+            Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !GetAtt ConfigBucket.Arn
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+          - Sid: AWSConfigBucketDelivery
+            Effect: Allow
+            Principal:
+              Service: config.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub '${ConfigBucket.Arn}/AWSLogs/${AWS::AccountId}/Config/*'
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+                AWS:SourceAccount: !Ref AWS::AccountId
 
 Outputs:
   InstanceId:

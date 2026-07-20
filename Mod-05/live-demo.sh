@@ -1,103 +1,158 @@
 #!/bin/bash
 # Module 05 - Live Demo: Infrastructure as Code with CloudFormation
-# Prereq: Run deploy.sh first (creates webapp-stack.yaml in this folder).
+# Prereq: Run deploy.sh first (creates webapp-stack.yaml in this folder)
+set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="${SCRIPT_DIR}/webapp-stack.yaml"
 
-echo "============================================"
-echo "  ACT 1: VALIDATE AND DEPLOY A STACK"
-echo "============================================"
+echo "========================================"
+echo " Module 05: Infrastructure as Code"
+echo " Template: webapp-stack.yaml"
+echo "========================================"
 echo ""
-echo ">> Show the template structure (key sections)..."
-read -p "Press Enter to show template..."
+
+# --- ACT 1: Validate and Deploy a Stack ---
+echo "--- ACT 1: Validate and Deploy ---"
+echo ""
+
+# Show the template structure (key sections)
+echo "[1.1] Template sections:"
 grep -E "^(Parameters|Conditions|Mappings|Resources|Outputs):" ${TEMPLATE}
-
 echo ""
-echo ">> Validate template..."
-aws cloudformation validate-template --template-body file://${TEMPLATE}
 
+# Validate template syntax
+echo "[1.2] Validating template:"
+aws cloudformation validate-template --template-body file://${TEMPLATE} \
+  --query '{Description:Description,Parameters:Parameters[*].ParameterKey}' --output table
 echo ""
-echo ">> Deploy stack as Development environment..."
-read -p "Press Enter to deploy..."
+
+# Deploy stack as Development environment
+echo "[1.3] Deploying stack as Development..."
 aws cloudformation create-stack \
   --stack-name demo-webapp-dev \
   --template-body file://${TEMPLATE} \
-  --parameters ParameterKey=EnvironmentType,ParameterValue=Development
-
+  --parameters ParameterKey=EnvironmentType,ParameterValue=Development \
+  --query 'StackId' --output text
 echo ""
-echo ">> Watch real-time creation events..."
-sleep 5
+
+# Watch real-time creation events
+echo "[1.4] Stack creation events (waiting 10s)..."
+sleep 10
 aws cloudformation describe-stack-events \
   --stack-name demo-webapp-dev \
   --query 'StackEvents[0:8].{Time:Timestamp,Resource:LogicalResourceId,Status:ResourceStatus}' \
   --output table
-
-echo ""
-echo ">> RESULT: One YAML file created VPC + Subnet + SecurityGroup + EC2."
 echo ""
 
-echo "============================================"
-echo "  ACT 2: STACK OUTPUTS AND DRIFT DETECTION"
-echo "============================================"
-read -p "Press Enter (waiting for stack to complete)..."
+# --- ACT 2: Stack Outputs and Drift Detection ---
+echo "--- ACT 2: Stack Outputs and Drift Detection ---"
+echo ""
 
+# Wait for stack creation to complete
+echo "[2.1] Waiting for stack creation to complete..."
 aws cloudformation wait stack-create-complete --stack-name demo-webapp-dev
-echo "  Stack complete!"
+echo "  ✓ Stack created"
 echo ""
-echo ">> Show stack outputs..."
+
+# Show stack outputs
+echo "[2.2] Stack outputs:"
 aws cloudformation describe-stacks --stack-name demo-webapp-dev \
   --query 'Stacks[0].Outputs[*].{Key:OutputKey,Value:OutputValue}' --output table
-
 echo ""
-echo ">> List all resources created..."
+
+# List all resources created by the stack
+echo "[2.3] Resources created:"
 aws cloudformation list-stack-resources --stack-name demo-webapp-dev \
   --query 'StackResourceSummaries[*].{Type:ResourceType,Logical:LogicalResourceId,Status:ResourceStatus}' \
   --output table
-
 echo ""
-echo ">> Run drift detection..."
-read -p "Press Enter..."
+
+# Run drift detection to catch manual changes
+echo "[2.4] Running drift detection..."
 DRIFT_ID=$(aws cloudformation detect-stack-drift \
   --stack-name demo-webapp-dev --query StackDriftDetectionId --output text)
 sleep 15
 aws cloudformation describe-stack-drift-detection-status \
   --stack-drift-detection-id ${DRIFT_ID} \
   --query '{Status:DetectionStatus,DriftStatus:StackDriftStatus}' --output table
-
-echo ""
-echo ">> RESULT: CloudFormation tracks everything. Drift detection catches manual changes."
 echo ""
 
-echo "============================================"
-echo "  ACT 3: CHANGE SETS - PREVIEW BEFORE APPLY"
-echo "============================================"
-read -p "Press Enter..."
+# --- ACT 3: Change Sets - Preview Before Apply ---
+echo "--- ACT 3: Change Sets - Preview Before Apply ---"
+echo ""
 
-echo ">> Create change set to upgrade to Production..."
+# Create change set to upgrade to Production
+echo "[3.1] Creating change set (Development → Production)..."
 aws cloudformation create-change-set \
   --stack-name demo-webapp-dev \
   --change-set-name upgrade-to-production \
-  --parameters ParameterKey=EnvironmentType,ParameterValue=Production
-
-sleep 10
+  --use-previous-template \
+  --parameters ParameterKey=EnvironmentType,ParameterValue=Production \
+  --query 'Id' --output text
 echo ""
-echo ">> Preview what will change..."
+
+echo "[3.2] Waiting for change set to be ready..."
+aws cloudformation wait change-set-create-complete \
+  --stack-name demo-webapp-dev \
+  --change-set-name upgrade-to-production 2>/dev/null || true
+echo ""
+
+# Preview what will change before executing
+echo "[3.3] Changes that would be applied:"
 aws cloudformation describe-change-set \
   --stack-name demo-webapp-dev \
   --change-set-name upgrade-to-production \
   --query 'Changes[*].ResourceChange.{Action:Action,Resource:LogicalResourceId,Replacement:Replacement}' \
   --output table
-
-echo ""
-echo ">> RESULT: Change sets let you SEE the impact before executing."
-echo "   This is safe change management for production infrastructure."
 echo ""
 
 # Cleanup demo stack
-read -p "Press Enter to delete demo webapp stack..."
-aws cloudformation delete-change-set --stack-name demo-webapp-dev --change-set-name upgrade-to-production
-aws cloudformation delete-stack --stack-name demo-webapp-dev
-echo "  Stack deletion initiated."
+echo "--- Cleanup ---"
 echo ""
-echo "============ DEMO COMPLETE ============"
+echo "[4.1] Deleting change set..."
+aws cloudformation delete-change-set --stack-name demo-webapp-dev --change-set-name upgrade-to-production
+echo ""
+
+echo "[4.2] Deleting demo stack..."
+# Get VPC ID before deletion for GuardDuty cleanup
+VPC_ID=$(aws cloudformation describe-stacks --stack-name demo-webapp-dev \
+  --query 'Stacks[0].Outputs[?OutputKey==`VPCId`].OutputValue' --output text 2>/dev/null) || true
+
+aws cloudformation delete-stack --stack-name demo-webapp-dev
+
+# GuardDuty auto-creates VPC endpoints and security groups in new VPCs
+# These block CloudFormation from deleting the VPC - clean them up
+if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "None" ]; then
+  sleep 10
+  GD_ENDPOINTS=$(aws ec2 describe-vpc-endpoints --filters "Name=vpc-id,Values=${VPC_ID}" \
+    --query 'VpcEndpoints[*].VpcEndpointId' --output text 2>/dev/null) || true
+  for EP in $GD_ENDPOINTS; do
+    [ -n "$EP" ] && [ "$EP" != "None" ] && aws ec2 delete-vpc-endpoints --vpc-endpoint-ids ${EP} 2>/dev/null || true
+  done
+  if [ -n "$GD_ENDPOINTS" ] && [ "$GD_ENDPOINTS" != "None" ]; then
+    sleep 30
+    ENIS=$(aws ec2 describe-network-interfaces --filters "Name=vpc-id,Values=${VPC_ID}" "Name=status,Values=available" \
+      --query 'NetworkInterfaces[*].NetworkInterfaceId' --output text 2>/dev/null) || true
+    for ENI in $ENIS; do
+      [ -n "$ENI" ] && [ "$ENI" != "None" ] && aws ec2 delete-network-interface --network-interface-id ${ENI} 2>/dev/null || true
+    done
+  fi
+  for attempt in 1 2 3; do
+    GD_SGS=$(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=${VPC_ID}" "Name=group-name,Values=GuardDuty*" \
+      --query 'SecurityGroups[*].GroupId' --output text 2>/dev/null) || true
+    if [ -z "$GD_SGS" ] || [ "$GD_SGS" = "None" ]; then break; fi
+    for SG in $GD_SGS; do
+      [ -n "$SG" ] && [ "$SG" != "None" ] && aws ec2 delete-security-group --group-id ${SG} 2>/dev/null || true
+    done
+    [ $attempt -lt 3 ] && sleep 10
+  done
+fi
+
+aws cloudformation wait stack-delete-complete --stack-name demo-webapp-dev 2>/dev/null || true
+echo "  ✓ Stack deleted"
+echo ""
+
+echo "========================================"
+echo " Demo Complete!"
+echo "========================================"

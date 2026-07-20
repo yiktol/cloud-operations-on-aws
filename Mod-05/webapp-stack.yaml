@@ -1,20 +1,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Demo - Web application stack (used in Module 05 live demo)'
+Description: 'Demo webapp stack - VPC, Subnet, Security Group, EC2'
 
 Parameters:
   EnvironmentType:
     Type: String
     Default: Development
     AllowedValues: [Development, Production]
-    Description: Select environment type
 
 Conditions:
   IsProduction: !Equals [!Ref EnvironmentType, Production]
 
 Mappings:
   InstanceTypeMap:
-    Development: {InstanceType: t3.micro}
-    Production:  {InstanceType: t3.small}
+    Development:
+      InstanceType: t3.micro
+    Production:
+      InstanceType: t3.small
 
 Resources:
   DemoVPC:
@@ -33,22 +34,24 @@ Resources:
       CidrBlock: 10.0.1.0/24
       AvailabilityZone: !Select [0, !GetAZs '']
 
-  DemoSG:
+  DemoSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow HTTP
       VpcId: !Ref DemoVPC
       SecurityGroupIngress:
-        - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
 
   DemoInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Sub >-
-        {{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
       SubnetId: !Ref DemoSubnet
-      SecurityGroupIds: [!Ref DemoSG]
+      SecurityGroupIds: [!Ref DemoSecurityGroup]
       Tags:
         - Key: Name
           Value: !Sub '${EnvironmentType}-WebServer'
@@ -62,4 +65,3 @@ Outputs:
     Value: !Ref DemoInstance
   InstanceType:
     Value: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
-    Description: Instance type deployed

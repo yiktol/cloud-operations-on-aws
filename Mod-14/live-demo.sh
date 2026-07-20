@@ -1,20 +1,25 @@
 #!/bin/bash
 # Module 14 - Live Demo: Cost Reporting, Alerts, and Optimization
-# NOTE: Billing alarm must be created in us-east-1 (AWS requirement)
+# Prereq: Run deploy.sh first
+set -e
 
 STACK_NAME="mod14-cost-optimization-demo"
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
 TOPIC_ARN=$(aws cloudformation describe-stacks --stack-name ${STACK_NAME} \
   --query 'Stacks[0].Outputs[?OutputKey==`SNSTopicArn`].OutputValue' --output text)
 
-echo "Account: ${ACCOUNT_ID} | Topic: ${TOPIC_ARN}"
+echo "========================================"
+echo " Module 14: Cost Optimization"
+echo " Account: ${ACCOUNT_ID}"
+echo "========================================"
 echo ""
 
-echo "============================================"
-echo "  ACT 1: COST VISIBILITY (Cost Explorer)"
-echo "============================================"
-read -p "Press Enter to view month-to-date costs by service..."
+# --- ACT 1: Cost Visibility (Cost Explorer) ---
+echo "--- ACT 1: Cost Visibility (Cost Explorer) ---"
+echo ""
+
+# Month-to-date costs grouped by service
+echo "[1.1] Month-to-date costs by service:"
 aws ce get-cost-and-usage \
   --time-period "Start=$(date +%Y-%m-01),End=$(date +%Y-%m-%d)" \
   --granularity MONTHLY \
@@ -22,24 +27,25 @@ aws ce get-cost-and-usage \
   --group-by Type=DIMENSION,Key=SERVICE \
   --query 'ResultsByTime[0].Groups[*].{Service:Keys[0],Cost:Metrics.BlendedCost.Amount}' \
   --output table
+echo ""
 
-read -p "Press Enter to get a 3-month cost forecast..."
-END_DATE=$(date -d '+3 months' +%Y-%m-01 2>/dev/null || date -v+3m +%Y-%m-01)
+# 3-month cost forecast (macOS-compatible date)
+echo "[1.2] 3-month cost forecast:"
+END_DATE=$(date -v+3m +%Y-%m-01 2>/dev/null || date -d '+3 months' +%Y-%m-01)
 aws ce get-cost-forecast \
   --time-period "Start=$(date +%Y-%m-%d),End=${END_DATE}" \
   --metric BLENDED_COST \
   --granularity MONTHLY \
   --query '{TotalForecast:Total.Amount,Unit:Total.Unit}' \
   --output table
-
-echo ""
-echo ">> RESULT: Cost Explorer shows WHERE money is going. Forecast shows WHERE it is heading."
 echo ""
 
-echo "============================================"
-echo "  ACT 2: BUDGETS - PROACTIVE COST CONTROL"
-echo "============================================"
-read -p "Press Enter to create a monthly budget with alerts..."
+# --- ACT 2: Budgets - Proactive Cost Control ---
+echo "--- ACT 2: Budgets - Proactive Cost Control ---"
+echo ""
+
+# Create monthly budget with alerts
+echo "[2.1] Creating monthly budget (\$100, alerts at 80%/100%)..."
 aws budgets create-budget \
   --account-id ${ACCOUNT_ID} \
   --budget '{
@@ -69,44 +75,46 @@ aws budgets create-budget \
       "Subscribers": [{"SubscriptionType": "SNS", "Address": "'"${TOPIC_ARN}"'"}]
     }
   ]'
+echo "  ✓ Budget created"
+echo ""
 
-echo "Budget created. Checking status..."
+# Verify budget status
+echo "[2.2] Budget status:"
 aws budgets describe-budgets --account-id ${ACCOUNT_ID} \
   --query 'Budgets[?BudgetName==`Demo-Monthly-Budget`].{Name:BudgetName,Limit:BudgetLimit.Amount,Actual:CalculatedSpend.ActualSpend.Amount}' \
   --output table
-
-echo ""
-echo ">> RESULT: Alert at 80% actual + 100% forecasted = early warning before overspend."
 echo ""
 
-echo "============================================"
-echo "  ACT 3: OPTIMIZATION - TRUSTED ADVISOR + COMPUTE OPTIMIZER"
-echo "============================================"
-read -p "Press Enter to check Trusted Advisor cost recommendations..."
-# Cost optimization checks (available without Business/Enterprise support for some)
+# --- ACT 3: Optimization Recommendations ---
+echo "--- ACT 3: Optimization Recommendations ---"
+echo ""
+
+# Trusted Advisor (requires Business/Enterprise support)
+echo "[3.1] Trusted Advisor cost checks:"
 aws support describe-trusted-advisor-check-summaries \
-  --check-ids "Qch7DwouX1" "hjLMh88uM8" "Z4AUBRNSminyHCqN5n" \
-  --query 'summaries[*].{Name:name,Status:status,Resources:resourcesSummary.resourcesFlagged}' \
-  --output table 2>/dev/null || echo "[INFO] Trusted Advisor check requires Business/Enterprise Support plan"
+  --check-ids "Qch7DwouX1" "hjLMh88uM8" \
+  --query 'summaries[*].{Name:name,Status:status,Flagged:resourcesSummary.resourcesFlagged}' \
+  --output table 2>/dev/null || echo "  (Requires Business/Enterprise support plan)"
+echo ""
 
-read -p "Press Enter to check Compute Optimizer EC2 recommendations..."
+# Compute Optimizer EC2 rightsizing
+echo "[3.2] Compute Optimizer EC2 recommendations:"
 aws compute-optimizer get-ec2-instance-recommendations \
-  --query 'instanceRecommendations[0:3].{Instance:instanceArn,Finding:finding,CurrentType:currentInstanceType,RecommendedType:recommendationOptions[0].instanceType,SavingsPercentage:recommendationOptions[0].performanceRisk}' \
-  --output table 2>/dev/null || echo "[INFO] Compute Optimizer needs to be opted in 24h before recommendations appear"
+  --query 'instanceRecommendations[0:3].{Instance:instanceArn,Finding:finding,CurrentType:currentInstanceType,Recommended:recommendationOptions[0].instanceType}' \
+  --output table 2>/dev/null || echo "  (No recommendations available - enable Compute Optimizer 24h in advance)"
+echo ""
 
-read -p "Press Enter to check Savings Plans recommendations..."
+# Savings Plans recommendations
+echo "[3.3] Savings Plans purchase recommendations:"
 aws ce get-savings-plans-purchase-recommendation \
   --savings-plans-type COMPUTE_SP \
   --term-in-years ONE_YEAR \
   --payment-option NO_UPFRONT \
-  --query 'SavingsPlansPurchaseRecommendation.SavingsPlansPurchaseRecommendationDetails[0].{HourlyCommitment:HourlyCommitmentToPurchase,EstimatedSavings:EstimatedSavingsAmount,SavingsRate:EstimatedSavingsPercentage}' \
-  --output table 2>/dev/null || echo "[INFO] No Savings Plans recommendations available yet"
+  --lookback-period-in-days THIRTY_DAYS \
+  --query 'SavingsPlansPurchaseRecommendation.SavingsPlansPurchaseRecommendationDetails[0:3].{HourlyCommitment:HourlyCommitmentToPurchase,EstimatedSavings:EstimatedSavingsAmount,SavingsRate:EstimatedSavingsPercentage}' \
+  --output table 2>/dev/null || echo "  (No Savings Plans recommendations available)"
+echo ""
 
-echo ""
-echo ">> RESULT: Three levers for optimization:"
-echo "   1. Trusted Advisor - unused/underused resources (quick wins)"
-echo "   2. Compute Optimizer - rightsize EC2 based on 14 days of metrics"
-echo "   3. Savings Plans/RIs - commit to usage for up to 66% discount"
-echo ""
-echo "============ DEMO COMPLETE ============"
-echo "Run cleanup.sh to remove the budget and SNS topic."
+echo "========================================"
+echo " Demo Complete!"
+echo "========================================"

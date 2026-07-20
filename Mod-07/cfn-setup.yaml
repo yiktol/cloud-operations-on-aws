@@ -1,80 +1,63 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 07 Demo Setup - Configure Highly Available Systems (ELB, Route 53)'
 
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC for the demo resources
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet in AZ1 (for ALB)
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Public subnet in AZ2 (for ALB)
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in AZ1 (for EC2 instances)
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet in AZ2 (for EC2 instances)
+
 Resources:
 
-  DemoVPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: true
-      Tags: [{Key: Name, Value: Mod07-DemoVPC}]
-
-  SubnetAZ1:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref DemoVPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags: [{Key: Name, Value: Mod07-Subnet-AZ1}]
-
-  SubnetAZ2:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref DemoVPC
-      CidrBlock: 10.0.2.0/24
-      AvailabilityZone: !Select [1, !GetAZs '']
-      MapPublicIpOnLaunch: true
-      Tags: [{Key: Name, Value: Mod07-Subnet-AZ2}]
-
-  IGW:
-    Type: AWS::EC2::InternetGateway
-  IGWAttachment:
-    Type: AWS::EC2::VPCGatewayAttachment
-    Properties:
-      VpcId: !Ref DemoVPC
-      InternetGatewayId: !Ref IGW
-
-  RouteTable:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref DemoVPC
-  PublicRoute:
-    Type: AWS::EC2::Route
-    DependsOn: IGWAttachment
-    Properties:
-      RouteTableId: !Ref RouteTable
-      DestinationCidrBlock: 0.0.0.0/0
-      GatewayId: !Ref IGW
-  RTAssoc1:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: {SubnetId: !Ref SubnetAZ1, RouteTableId: !Ref RouteTable}
-  RTAssoc2:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties: {SubnetId: !Ref SubnetAZ2, RouteTableId: !Ref RouteTable}
-
-  DemoSG:
+  ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: HTTP access
-      VpcId: !Ref DemoVPC
+      GroupDescription: ALB - Allow HTTP from internet
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - {IpProtocol: tcp, FromPort: 80, ToPort: 80, CidrIp: 0.0.0.0/0}
+      Tags: [{Key: Name, Value: Mod07-ALB-SG}]
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Instances - Allow HTTP from ALB only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags: [{Key: Name, Value: Mod07-Instance-SG}]
 
   WebInstance1:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Sub !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
-      SubnetId: !Ref SubnetAZ1
-      SecurityGroupIds: [!Ref DemoSG]
+      SubnetId: !Ref PrivateSubnet1
+      SecurityGroupIds: [!Ref InstanceSecurityGroup]
       UserData:
         Fn::Base64: |
           #!/bin/bash
           yum install -y httpd
-          INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-          AZ=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+          AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
           echo "<h1>Instance: ${INSTANCE_ID}</h1><p>AZ: ${AZ}</p>" > /var/www/html/index.html
           systemctl start httpd && systemctl enable httpd
       Tags: [{Key: Name, Value: Web-AZ1}]
@@ -82,25 +65,28 @@ Resources:
   WebInstance2:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Sub !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
-      SubnetId: !Ref SubnetAZ2
-      SecurityGroupIds: [!Ref DemoSG]
+      SubnetId: !Ref PrivateSubnet2
+      SecurityGroupIds: [!Ref InstanceSecurityGroup]
       UserData:
         Fn::Base64: |
           #!/bin/bash
           yum install -y httpd
-          INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-          AZ=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
+          TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+          INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
+          AZ=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/placement/availability-zone)
           echo "<h1>Instance: ${INSTANCE_ID}</h1><p>AZ: ${AZ}</p>" > /var/www/html/index.html
           systemctl start httpd && systemctl enable httpd
       Tags: [{Key: Name, Value: Web-AZ2}]
 
 Outputs:
-  VPCId: {Value: !Ref DemoVPC}
-  SubnetAZ1Id: {Value: !Ref SubnetAZ1}
-  SubnetAZ2Id: {Value: !Ref SubnetAZ2}
-  SGId: {Value: !Ref DemoSG}
+  VPCId: {Value: !Ref VpcId}
+  PublicSubnet1Id: {Value: !Ref PublicSubnet1}
+  PublicSubnet2Id: {Value: !Ref PublicSubnet2}
+  PrivateSubnet1Id: {Value: !Ref PrivateSubnet1}
+  PrivateSubnet2Id: {Value: !Ref PrivateSubnet2}
+  ALBSecurityGroupId: {Value: !Ref ALBSecurityGroup}
+  InstanceSecurityGroupId: {Value: !Ref InstanceSecurityGroup}
   Instance1Id: {Value: !Ref WebInstance1}
   Instance2Id: {Value: !Ref WebInstance2}
-

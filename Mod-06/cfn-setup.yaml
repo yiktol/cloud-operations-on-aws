@@ -1,6 +1,14 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Module 06 Demo Setup - Manage Resources (Run Command, Parameter Store, Maintenance Windows)'
 
+Parameters:
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Private subnet with NAT Gateway access for SSM connectivity
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to create the security group in
+
 Resources:
 
   DemoInstanceRole:
@@ -22,12 +30,27 @@ Resources:
       InstanceProfileName: Mod06-DemoInstanceProfile
       Roles: [!Ref DemoInstanceRole]
 
+  DemoSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Mod06 Demo - Outbound only (SSM access via NAT)
+      VpcId: !Ref VpcId
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: Mod06-DemoSG
+
   DemoInstance:
     Type: AWS::EC2::Instance
     Properties:
-      ImageId: !Sub !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
       InstanceType: t3.micro
       IamInstanceProfile: !Ref DemoInstanceProfile
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref DemoSecurityGroup
       Tags:
         - Key: Name
           Value: Mod06-DemoInstance
@@ -39,4 +62,3 @@ Resources:
 Outputs:
   InstanceId:
     Value: !Ref DemoInstance
-
