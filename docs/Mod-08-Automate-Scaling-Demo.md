@@ -2,25 +2,32 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- Default VPC with subnets
-- The ALB from Module 07 (or create a new one)
+- Module 08 CloudFormation stack deployed (`Mod-08/cfn-setup.yaml`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
-```bash
-# Get VPC and subnets
-VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
-SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[*].SubnetId' --output text)
-SUBNET_1=$(echo $SUBNETS | awk '{print $1}')
-SUBNET_2=$(echo $SUBNETS | awk '{print $2}')
+### Deploy the CloudFormation stack
+The stack creates: IAM role/profile with SSM access, and a security group for ASG instances.
 
-# Security group
-SG_ID=$(aws ec2 create-security-group --group-name demo-asg-sg \
-  --description "Demo ASG" --vpc-id ${VPC_ID} --query GroupId --output text)
-aws ec2 authorize-security-group-ingress --group-id ${SG_ID} \
-  --protocol tcp --port 80 --cidr 0.0.0.0/0
+```bash
+aws cloudformation deploy \
+  --template-file Mod-08/cfn-setup.yaml \
+  --stack-name mod08-demo \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    VpcId=<your-vpc-id> \
+    PrivateSubnet1=<private-subnet-az1> \
+    PrivateSubnet2=<private-subnet-az2>
+```
+
+### Get resource IDs for the demo
+```bash
+SG_ID=$(aws cloudformation describe-stacks --stack-name mod08-demo --query "Stacks[0].Outputs[?OutputKey=='SGId'].OutputValue" --output text)
+SUBNET_1=$(aws cloudformation describe-stacks --stack-name mod08-demo --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet1Id'].OutputValue" --output text)
+SUBNET_2=$(aws cloudformation describe-stacks --stack-name mod08-demo --query "Stacks[0].Outputs[?OutputKey=='PrivateSubnet2Id'].OutputValue" --output text)
+PROFILE_ARN=$(aws cloudformation describe-stacks --stack-name mod08-demo --query "Stacks[0].Outputs[?OutputKey=='InstanceProfileArn'].OutputValue" --output text)
 ```
 
 ---
@@ -35,7 +42,8 @@ aws ec2 authorize-security-group-ingress --group-id ${SG_ID} \
 # Create launch template
 USER_DATA=$(echo '#!/bin/bash
 yum install -y httpd stress
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" http://169.254.169.254/latest/meta-data/instance-id)
 echo "<h1>Instance: ${INSTANCE_ID}</h1><p>Launched by Auto Scaling</p>" > /var/www/html/index.html
 systemctl start httpd' | base64)
 
@@ -45,6 +53,7 @@ TEMPLATE_ID=$(aws ec2 create-launch-template \
     \"ImageId\":\"resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64\",
     \"InstanceType\":\"t3.micro\",
     \"SecurityGroupIds\":[\"${SG_ID}\"],
+    \"IamInstanceProfile\":{\"Arn\":\"${PROFILE_ARN}\"},
     \"UserData\":\"${USER_DATA}\"
   }" --query 'LaunchTemplate.LaunchTemplateId' --output text)
 
@@ -151,8 +160,8 @@ aws autoscaling delete-auto-scaling-group --auto-scaling-group-name demo-asg --f
 # Delete launch template
 aws ec2 delete-launch-template --launch-template-id ${TEMPLATE_ID}
 
-# Delete security group
-aws ec2 delete-security-group --group-id ${SG_ID}
+# Delete the stack (removes IAM role and security group)
+aws cloudformation delete-stack --stack-name mod08-demo
 ```
 
 ---

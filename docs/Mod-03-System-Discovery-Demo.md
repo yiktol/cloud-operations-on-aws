@@ -2,120 +2,29 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- At least one EC2 instance running with SSM Agent installed (Amazon Linux 2/2023 has it by default)
-- IAM instance profile with `AmazonSSMManagedInstanceCore` policy attached to the instance
-- AWS Config enabled (or be prepared to enable it live)
+- Module 03 CloudFormation stack deployed (`Mod-03/cfn-setup.yaml`)
+- AWS Config already enabled in the region
 
 ---
 
 ## Part 1: Setup (do before class)
 
-### Step 1: Launch an EC2 instance with SSM access
+### Deploy the CloudFormation stack
+The stack creates: EC2 instance with SSM access (no SSH, no public IP), IAM role/profile, security group, Config rules, and an SSM Inventory association.
 
 ```bash
-# Create an IAM role for EC2 with SSM access
-aws iam create-role \
-  --role-name EC2-SSM-DemoRole \
-  --assume-role-policy-document '{
-    "Version": "2012-10-17",
-    "Statement": [{
-      "Effect": "Allow",
-      "Principal": {"Service": "ec2.amazonaws.com"},
-      "Action": "sts:AssumeRole"
-    }]
-  }'
-
-aws iam attach-role-policy \
-  --role-name EC2-SSM-DemoRole \
-  --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-
-# Create instance profile
-aws iam create-instance-profile --instance-profile-name EC2-SSM-DemoProfile
-aws iam add-role-to-instance-profile \
-  --instance-profile-name EC2-SSM-DemoProfile \
-  --role-name EC2-SSM-DemoRole
-
-# Launch an Amazon Linux 2023 instance (NO key pair, NO public SSH)
-aws ec2 run-instances \
-  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
-  --instance-type t3.micro \
-  --iam-instance-profile Name=EC2-SSM-DemoProfile \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Demo-SSM-Instance},{Key=Environment,Value=Production}]' \
-  --count 1
-
-# Note the instance ID from the output
-INSTANCE_ID="i-XXXXXXXXXXXX"
+aws cloudformation deploy \
+  --template-file Mod-03/cfn-setup.yaml \
+  --stack-name mod03-demo \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    SubnetId=<your-subnet-id> \
+    VpcId=<your-vpc-id>
 ```
 
-### Step 2: Enable AWS Config (if not already enabled)
-
+### Get the instance ID for the demo
 ```bash
-# Create an S3 bucket for Config
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
-CONFIG_BUCKET="config-bucket-${ACCOUNT_ID}-${REGION}"
-
-aws s3 mb s3://${CONFIG_BUCKET}
-
-# Create Config service role
-aws iam create-service-linked-role --aws-service-name config.amazonaws.com
-
-# Set up the configuration recorder
-aws configservice put-configuration-recorder \
-  --configuration-recorder name=default,roleARN=arn:aws:iam::${ACCOUNT_ID}:role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig \
-  --recording-group allSupported=true,includeGlobalResourceTypes=true
-
-# Set up delivery channel
-aws configservice put-delivery-channel \
-  --delivery-channel name=default,s3BucketName=${CONFIG_BUCKET}
-
-# Start recording
-aws configservice start-configuration-recorder --configuration-recorder-name default
-```
-
-### Step 3: Add a Config rule for compliance demo
-
-```bash
-# Rule: EC2 instances must be managed by Systems Manager
-aws configservice put-config-rule --config-rule '{
-  "ConfigRuleName": "ec2-instance-managed-by-systems-manager",
-  "Source": {
-    "Owner": "AWS",
-    "SourceIdentifier": "EC2_INSTANCE_MANAGED_BY_SSM"
-  },
-  "Scope": {
-    "ComplianceResourceTypes": ["AWS::EC2::Instance"]
-  }
-}'
-
-# Rule: EC2 instances should not have public IPs
-aws configservice put-config-rule --config-rule '{
-  "ConfigRuleName": "ec2-instance-no-public-ip",
-  "Source": {
-    "Owner": "AWS",
-    "SourceIdentifier": "EC2_INSTANCE_NO_PUBLIC_IP"
-  },
-  "Scope": {
-    "ComplianceResourceTypes": ["AWS::EC2::Instance"]
-  }
-}'
-```
-
-### Step 4: Set up Systems Manager Inventory collection
-
-```bash
-# Create an inventory association (collects every 30 minutes)
-aws ssm create-association \
-  --name "AWS-GatherSoftwareInventory" \
-  --targets "Key=InstanceIds,Values=${INSTANCE_ID}" \
-  --schedule-expression "rate(30 minutes)" \
-  --parameters '{
-    "applications": ["Enabled"],
-    "awsComponents": ["Enabled"],
-    "networkConfig": ["Enabled"],
-    "windowsUpdates": ["Enabled"],
-    "services": ["Enabled"]
-  }'
+INSTANCE_ID=$(aws cloudformation describe-stacks --stack-name mod03-demo --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
 ```
 
 > **Wait 5–10 minutes** for inventory to be collected and Config to evaluate rules.
@@ -294,32 +203,7 @@ Open the AWS Console and show:
 ## Part 3: Cleanup
 
 ```bash
-# Delete the Config rules
-aws configservice delete-config-rule --config-rule-name ec2-instance-managed-by-systems-manager
-aws configservice delete-config-rule --config-rule-name ec2-instance-no-public-ip
-
-# Stop Config recorder
-aws configservice stop-configuration-recorder --configuration-recorder-name default
-
-# Delete the SSM association
-ASSOC_ID=$(aws ssm list-associations --query "Associations[?Name=='AWS-GatherSoftwareInventory'].AssociationId" --output text)
-aws ssm delete-association --association-id ${ASSOC_ID}
-
-# Terminate the EC2 instance
-aws ec2 terminate-instances --instance-ids ${INSTANCE_ID}
-
-# Wait for termination, then clean up IAM
-aws iam remove-role-from-instance-profile \
-  --instance-profile-name EC2-SSM-DemoProfile \
-  --role-name EC2-SSM-DemoRole
-aws iam delete-instance-profile --instance-profile-name EC2-SSM-DemoProfile
-aws iam detach-role-policy \
-  --role-name EC2-SSM-DemoRole \
-  --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
-aws iam delete-role --role-name EC2-SSM-DemoRole
-
-# Delete Config S3 bucket
-aws s3 rb s3://${CONFIG_BUCKET} --force
+aws cloudformation delete-stack --stack-name mod03-demo
 ```
 
 ---

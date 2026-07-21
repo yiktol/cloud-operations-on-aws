@@ -5,17 +5,15 @@ Uses the diagrams library with custom AWS icons from the aws-icons folder.
 import os
 import sys
 
-# Add graphviz to PATH
-os.environ["PATH"] = r"D:\Users\erictole\OneDrive - amazon.com\demo\cloud-operations-on-aws\graphviz\Graphviz-12.2.1-win64\bin" + ";" + os.environ.get("PATH", "")
+# Base paths
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PARENT_DIR = os.path.dirname(BASE_DIR)
+ICONS_DIR = os.path.join(PARENT_DIR, "aws-icons", "Architecture-Service-Icons_04302026")
+GROUP_ICONS_DIR = os.path.join(PARENT_DIR, "aws-icons", "Architecture-Group-Icons_04302026")
+OUTPUT_DIR = BASE_DIR
 
 from diagrams import Diagram, Cluster, Edge
 from diagrams.custom import Custom
-
-# Base paths
-BASE_DIR = r"D:\Users\erictole\OneDrive - amazon.com\demo\cloud-operations-on-aws"
-ICONS_DIR = os.path.join(BASE_DIR, "aws-icons", "Architecture-Service-Icons_04302026")
-GROUP_ICONS_DIR = os.path.join(BASE_DIR, "aws-icons", "Architecture-Group-Icons_04302026")
-OUTPUT_DIR = os.path.join(BASE_DIR, "diagrams")
 
 # Icon paths helper
 def icon(category, filename):
@@ -57,8 +55,9 @@ GRAPH_ATTR = {
     "bgcolor": "#FFFFFF",
     "pad": "0.5",
     "nodesep": "0.8",
-    "ranksep": "1.0",
+    "ranksep": "1.2",
     "splines": "curved",
+    "rankdir": "LR",
 }
 EDGE_ATTR = {
     "color": "#555555",
@@ -84,20 +83,17 @@ def mod02_access_management():
     ):
         user = Custom("IAM User\n(demo-user)", IAM)
 
-        with Cluster("IAM Policies", graph_attr={"style": "dashed", "color": "#FF9900", "fontcolor": "#FF9900"}):
-            allow = Custom("Allow S3 Read\n(Explicit Allow)", IAM)
-            deny = Custom("Deny Confidential\n(Explicit Deny)", IAM)
+        allow = Custom("Allow S3 Read\n(Explicit Allow)", IAM)
+        deny = Custom("Deny Confidential\n(Explicit Deny)", IAM)
 
-        with Cluster("S3 Buckets", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            general = Custom("general-bucket\n✅ Allowed", S3)
-            confidential = Custom("confidential-bucket\n❌ Denied", S3)
+        general = Custom("general-bucket\n✅ Allowed", S3)
+        confidential = Custom("confidential-bucket\n❌ Denied", S3)
 
         role = Custom("EmergencyAdmin\nRole (STS)", IAM)
 
         user >> Edge(label="attached", color="#FF9900", style="bold") >> allow
         user >> Edge(label="attached", color="#DD3522", style="bold") >> deny
         allow >> Edge(label="allows all S3", color="#3F8624") >> general
-        allow >> Edge(label="allows", color="#3F8624", style="dashed") >> confidential
         deny >> Edge(label="DENY wins", color="#DD3522", style="bold") >> confidential
         user >> Edge(label="sts:AssumeRole", color="#8C4FFF", style="dashed") >> role
 
@@ -111,28 +107,18 @@ def mod03_system_discovery():
         "Module 03: System Discovery",
         filename=os.path.join(OUTPUT_DIR, "mod03-system-discovery"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
-        with Cluster("EC2 Instance", graph_attr={"style": "rounded", "color": "#ED7100", "fontcolor": "#ED7100"}):
-            instance = Custom("Amazon Linux 2023\n(SSM Agent)", EC2)
+        ssm = Custom("Session Manager\n(secure shell)", SSM)
+        instance = Custom("EC2 Instance\n(SSM Agent)", EC2)
+        inventory = Custom("SSM Inventory\n(Software, OS)", SSM)
+        config = Custom("AWS Config\n(Compliance)", CONFIG)
 
-        ssm = Custom("Systems Manager\nSession Manager", SSM)
-        inventory = Custom("SSM Inventory\n(Software, OS, Network)", SSM)
-        config = Custom("AWS Config\n(Resource Compliance)", CONFIG)
-
-        with Cluster("Config Rules", graph_attr={"style": "dashed", "color": "#DD3522", "fontcolor": "#DD3522"}):
-            rule1 = Custom("Managed by SSM", CONFIG)
-            rule2 = Custom("No Public IP", CONFIG)
-
-        ssm >> Edge(label="secure shell\n(no SSH)", color="#ED7100") >> instance
-        inventory >> Edge(label="collects\ninventory", color="#3F8624") >> instance
-        config >> Edge(label="evaluates", color="#8C4FFF") >> rule1
-        config >> Edge(label="evaluates", color="#8C4FFF") >> rule2
-        rule1 >> Edge(label="checks", color="#555555", style="dashed") >> instance
-        rule2 >> Edge(label="checks", color="#555555", style="dashed") >> instance
+        ssm >> Edge(label="no SSH needed", color="#ED7100") >> instance >> Edge(label="collects", color="#3F8624") >> inventory
+        instance >> Edge(label="evaluates rules", color="#8C4FFF") >> config
 
     print("  ✓ mod03-system-discovery.png")
 
@@ -177,29 +163,19 @@ def mod05_automate_deployment():
         "Module 05: Infrastructure as Code with CloudFormation",
         filename=os.path.join(OUTPUT_DIR, "mod05-automate-deployment"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
         cfn = Custom("CloudFormation\nStack", CLOUDFORMATION)
-
-        with Cluster("Deployed Resources", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            vpc = Custom("VPC\n10.0.0.0/16", VPC)
-            subnet = Custom("Subnet\n10.0.1.0/24", VPC)
-            sg = Custom("Security Group\n(HTTP)", VPC)
-            instance = Custom("EC2 Instance\n(WebServer)", EC2)
-
-        with Cluster("Stack Operations", graph_attr={"style": "dashed", "color": "#FF9900", "fontcolor": "#FF9900"}):
-            drift = Custom("Drift\nDetection", CLOUDFORMATION)
-            changeset = Custom("Change Sets\n(Preview)", CLOUDFORMATION)
+        vpc = Custom("VPC + Subnet\n+ Security Group", VPC)
+        instance = Custom("EC2 Instance\n(WebServer)", EC2)
+        drift = Custom("Drift Detection\n& Change Sets", CLOUDFORMATION)
 
         cfn >> Edge(label="creates", color="#3F8624", style="bold") >> vpc
-        cfn >> Edge(label="creates", color="#3F8624", style="bold") >> subnet
-        cfn >> Edge(label="creates", color="#3F8624", style="bold") >> sg
-        cfn >> Edge(label="creates", color="#3F8624", style="bold") >> instance
-        cfn >> Edge(label="monitors", color="#FF9900", style="dashed") >> drift
-        cfn >> Edge(label="safe updates", color="#8C4FFF", style="dashed") >> changeset
+        vpc >> Edge(label="hosts", color="#3F8624") >> instance
+        cfn >> Edge(label="monitors drift", color="#FF9900", style="dashed") >> drift
 
     print("  ✓ mod05-automate-deployment.png")
 
@@ -216,23 +192,15 @@ def mod06_manage_resources():
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
-        with Cluster("Systems Manager", graph_attr={"style": "rounded", "color": "#ED7100", "fontcolor": "#ED7100"}):
-            run_cmd = Custom("Run Command\n(execute at scale)", SSM)
-            param_store = Custom("Parameter Store\n(configs & secrets)", SSM)
-            maint_win = Custom("Maintenance\nWindows", SSM)
-
-        with Cluster("EC2 Fleet", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            ec2_1 = Custom("Instance 1", EC2)
-            ec2_2 = Custom("Instance 2", EC2)
-            ec2_3 = Custom("Instance N", EC2)
-
+        run_cmd = Custom("Run Command", SSM)
+        ec2_fleet = Custom("EC2 Fleet\n(by tag)", EC2)
+        param_store = Custom("Parameter Store\n(configs & secrets)", SSM)
         kms = Custom("KMS\n(encryption)", KMS)
+        maint_win = Custom("Maintenance\nWindows", SSM)
 
-        run_cmd >> Edge(label="remote exec", color="#ED7100") >> ec2_1
-        run_cmd >> Edge(label="by tag", color="#ED7100") >> ec2_2
-        run_cmd >> Edge(label="at scale", color="#ED7100") >> ec2_3
-        maint_win >> Edge(label="scheduled\npatching", color="#8C4FFF", style="dashed") >> ec2_1
-        param_store >> Edge(label="encrypted", color="#DD3522", style="dashed") >> kms
+        run_cmd >> Edge(label="remote exec at scale", color="#ED7100") >> ec2_fleet
+        ec2_fleet >> Edge(label="scheduled patching", color="#8C4FFF", style="dashed") >> maint_win
+        param_store >> Edge(label="encrypted values", color="#DD3522", style="dashed") >> kms
 
     print("  ✓ mod06-manage-resources.png")
 
@@ -244,23 +212,19 @@ def mod07_high_availability():
         "Module 07: Load Balancing & High Availability",
         filename=os.path.join(OUTPUT_DIR, "mod07-high-availability"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
         users = Custom("Users", IAM)
         alb = Custom("Application\nLoad Balancer", ELB)
-
-        with Cluster("Availability Zone 1", graph_attr={"style": "rounded", "color": "#ED7100", "fontcolor": "#ED7100"}):
-            web1 = Custom("Web-AZ1\n(httpd)", EC2)
-
-        with Cluster("Availability Zone 2", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            web2 = Custom("Web-AZ2\n(httpd)", EC2)
+        web1 = Custom("Web-AZ1\n(httpd)", EC2)
+        web2 = Custom("Web-AZ2\n(httpd)", EC2)
 
         users >> Edge(label="HTTP", color="#555555", style="bold") >> alb
-        alb >> Edge(label="health check\n+ forward", color="#ED7100") >> web1
-        alb >> Edge(label="health check\n+ forward", color="#3F8624") >> web2
+        alb >> Edge(label="health check + forward", color="#ED7100") >> web1
+        alb >> Edge(label="health check + forward", color="#3F8624") >> web2
 
     print("  ✓ mod07-high-availability.png")
 
@@ -272,27 +236,19 @@ def mod08_automate_scaling():
         "Module 08: Auto Scaling with Target Tracking",
         filename=os.path.join(OUTPUT_DIR, "mod08-automate-scaling"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
-        cw = Custom("CloudWatch\n(CPU metrics)", CLOUDWATCH)
+        cw = Custom("CloudWatch\n(CPU > 50%)", CLOUDWATCH)
         asg = Custom("Auto Scaling Group\nMin=1, Max=4", AUTOSCALING)
+        template = Custom("Launch Template\nt3.micro + httpd", EC2)
+        fleet = Custom("Scaled Fleet\n(Multi-AZ)", EC2)
 
-        with Cluster("Launch Template", graph_attr={"style": "dashed", "color": "#8C4FFF", "fontcolor": "#8C4FFF"}):
-            template = Custom("t3.micro\nAmazon Linux + httpd", EC2)
-
-        with Cluster("Scaled Fleet (Multi-AZ)", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            i1 = Custom("Instance 1", EC2)
-            i2 = Custom("Instance 2", EC2)
-            i3 = Custom("Instance 3\n(scale out)", EC2)
-
-        cw >> Edge(label="CPU > 50%\ntrigger", color="#DD3522", style="bold") >> asg
-        asg >> Edge(label="launches from\ntemplate", color="#8C4FFF") >> template
-        asg >> Edge(label="manages", color="#3F8624") >> i1
-        asg >> Edge(label="manages", color="#3F8624") >> i2
-        asg >> Edge(label="scale out", color="#ED7100", style="bold") >> i3
+        cw >> Edge(label="triggers", color="#DD3522", style="bold") >> asg
+        asg >> Edge(label="uses", color="#8C4FFF") >> template
+        template >> Edge(label="launches", color="#3F8624") >> fleet
 
     print("  ✓ mod08-automate-scaling.png")
 
@@ -368,32 +324,25 @@ def mod11_secure_networks():
         "Module 11: VPC Security Layers",
         filename=os.path.join(OUTPUT_DIR, "mod11-secure-networks"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
         internet = Custom("Internet", VPC)
-
-        with Cluster("VPC (10.0.0.0/16)", graph_attr={"style": "rounded", "color": "#8C4FFF", "fontcolor": "#8C4FFF"}):
-            igw = Custom("Internet\nGateway", VPC)
-
-            with Cluster("Public Subnet (10.0.1.0/24)", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-                nacl_pub = Custom("NACL\n(stateless)", VPC)
-                sg_pub = Custom("Security Group\n(stateful)", VPC)
-                pub_instance = Custom("Web Server", EC2)
-
-            with Cluster("Private Subnet (10.0.2.0/24)", graph_attr={"style": "rounded", "color": "#ED7100", "fontcolor": "#ED7100"}):
-                priv_instance = Custom("Backend\nServer", EC2)
-
-        flow_logs = Custom("VPC Flow Logs\n(forensics)", CLOUDWATCH)
+        igw = Custom("Internet\nGateway", VPC)
+        nacl_pub = Custom("NACL\n(stateless)", VPC)
+        sg_pub = Custom("Security Group\n(stateful)", VPC)
+        pub_instance = Custom("Web Server\n(public)", EC2)
+        priv_instance = Custom("Backend\n(private)", EC2)
+        flow_logs = Custom("VPC Flow Logs", CLOUDWATCH)
 
         internet >> Edge(color="#555555", style="bold") >> igw
         igw >> Edge(label="route", color="#3F8624") >> nacl_pub
         nacl_pub >> Edge(label="subnet filter", color="#8C4FFF") >> sg_pub
         sg_pub >> Edge(label="instance filter", color="#ED7100") >> pub_instance
-        pub_instance >> Edge(label="no route", color="#DD3522", style="dashed") >> priv_instance
-        igw >> Edge(label="logs all traffic", color="#FF9900", style="dashed") >> flow_logs
+        pub_instance >> Edge(label="private only", color="#DD3522", style="dashed") >> priv_instance
+        igw >> Edge(label="logs traffic", color="#FF9900", style="dashed") >> flow_logs
 
     print("  ✓ mod11-secure-networks.png")
 
@@ -405,35 +354,19 @@ def mod12_mountable_storage():
         "Module 12: EBS, Snapshots & Shared Storage",
         filename=os.path.join(OUTPUT_DIR, "mod12-mountable-storage"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
         instance = Custom("EC2 Instance", EC2)
+        ebs = Custom("EBS Volumes\n(gp3, io2)", EBS)
+        snapshot = Custom("EBS Snapshots\n(incremental)", EBS)
+        efs = Custom("Amazon EFS\n(shared NFS)", EFS)
 
-        with Cluster("Block Storage (EBS)", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            gp3 = Custom("gp3 Volume\n(20 GiB, 3K IOPS)", EBS)
-            io2 = Custom("io2 Volume\n(10 GiB, 5K IOPS)", EBS)
-
-        with Cluster("Data Protection", graph_attr={"style": "rounded", "color": "#8C4FFF", "fontcolor": "#8C4FFF"}):
-            snapshot = Custom("EBS Snapshot\n(incremental to S3)", EBS)
-            dlm = Custom("Data Lifecycle\nManager", EBS)
-            backup_svc = Custom("AWS Backup\n(multi-service)", BACKUP)
-
-        with Cluster("Shared Storage", graph_attr={"style": "dashed", "color": "#ED7100", "fontcolor": "#ED7100"}):
-            efs = Custom("Amazon EFS\n(NFS, multi-AZ)", EFS)
-            fsx = Custom("Amazon FSx\n(Windows/Lustre)", FSX)
-
-        cw = Custom("CloudWatch\n(I/O metrics)", CLOUDWATCH)
-
-        instance >> Edge(label="attach", color="#3F8624", style="bold") >> gp3
-        instance >> Edge(label="attach", color="#3F8624") >> io2
-        gp3 >> Edge(label="snapshot", color="#8C4FFF") >> snapshot
-        dlm >> Edge(label="automates", color="#8C4FFF", style="dashed") >> snapshot
-        backup_svc >> Edge(label="centralized", color="#FF9900", style="dashed") >> snapshot
+        instance >> Edge(label="attach", color="#3F8624", style="bold") >> ebs
+        ebs >> Edge(label="snapshot", color="#8C4FFF") >> snapshot
         instance >> Edge(label="mount", color="#ED7100", style="dashed") >> efs
-        gp3 >> Edge(label="metrics", color="#555555", style="dashed") >> cw
 
     print("  ✓ mod12-mountable-storage.png")
 
@@ -474,29 +407,19 @@ def mod14_cost_optimization():
         "Module 14: Cost Awareness, Control & Optimization",
         filename=os.path.join(OUTPUT_DIR, "mod14-cost-optimization"),
         show=False,
-        direction="TB",
+        direction="LR",
         graph_attr=GRAPH_ATTR,
         edge_attr=EDGE_ATTR,
         node_attr=NODE_ATTR,
     ):
-        with Cluster("1. Awareness", graph_attr={"style": "rounded", "color": "#3F8624", "fontcolor": "#3F8624"}):
-            cost_explorer = Custom("Cost Explorer\n(trends & forecast)", COST_EXPLORER)
-            cur = Custom("Cost & Usage\nReport (CUR)", BUDGETS)
-
-        with Cluster("2. Control", graph_attr={"style": "rounded", "color": "#FF9900", "fontcolor": "#FF9900"}):
-            budgets = Custom("AWS Budgets\n($100/month)", BUDGETS)
-            billing_alarm = Custom("CloudWatch\nBilling Alarm", CLOUDWATCH)
-
-        with Cluster("3. Optimization", graph_attr={"style": "rounded", "color": "#8C4FFF", "fontcolor": "#8C4FFF"}):
-            trusted_adv = Custom("Trusted Advisor\n(cost checks)", TRUSTED_ADVISOR)
-            compute_opt = Custom("Compute\nOptimizer", COMPUTE_OPTIMIZER)
-
+        cost_explorer = Custom("Cost Explorer\n(trends & forecast)", COST_EXPLORER)
+        budgets = Custom("AWS Budgets\n($100/month)", BUDGETS)
         sns = Custom("SNS\n(email alerts)", SNS)
+        trusted_adv = Custom("Trusted Advisor\n& Compute Optimizer", TRUSTED_ADVISOR)
 
-        budgets >> Edge(label="80% threshold", color="#FF9900", style="bold") >> sns
-        billing_alarm >> Edge(label=">$50 alert", color="#DD3522", style="bold") >> sns
         cost_explorer >> Edge(label="informs", color="#3F8624", style="dashed") >> budgets
-        trusted_adv >> Edge(label="recommends\nrightsizing", color="#8C4FFF", style="dashed") >> compute_opt
+        budgets >> Edge(label="80% threshold", color="#FF9900", style="bold") >> sns
+        trusted_adv >> Edge(label="recommends rightsizing", color="#8C4FFF", style="dashed") >> sns
 
     print("  ✓ mod14-cost-optimization.png")
 

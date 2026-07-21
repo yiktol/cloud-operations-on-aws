@@ -2,56 +2,36 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- A VPC with at least 2 public subnets in different AZs
+- Module 07 CloudFormation stack deployed (`Mod-07/cfn-setup.yaml`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
+### Deploy the CloudFormation stack
+The stack creates: two EC2 web server instances in different AZs (with httpd pre-installed), ALB and instance security groups.
+
 ```bash
-# Get default VPC and subnets
-VPC_ID=$(aws ec2 describe-vpcs --filters "Name=isDefault,Values=true" --query 'Vpcs[0].VpcId' --output text)
-SUBNETS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=${VPC_ID}" --query 'Subnets[*].SubnetId' --output text)
-SUBNET_1=$(echo $SUBNETS | awk '{print $1}')
-SUBNET_2=$(echo $SUBNETS | awk '{print $2}')
+aws cloudformation deploy \
+  --template-file Mod-07/cfn-setup.yaml \
+  --stack-name mod07-demo \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    VpcId=<your-vpc-id> \
+    PublicSubnet1=<public-subnet-az1> \
+    PublicSubnet2=<public-subnet-az2> \
+    PrivateSubnet1=<private-subnet-az1> \
+    PrivateSubnet2=<private-subnet-az2>
+```
 
-# Create a security group for the ALB and instances
-SG_ID=$(aws ec2 create-security-group \
-  --group-name demo-ha-sg \
-  --description "Demo HA security group" \
-  --vpc-id ${VPC_ID} \
-  --query GroupId --output text)
-
-aws ec2 authorize-security-group-ingress --group-id ${SG_ID} \
-  --protocol tcp --port 80 --cidr 0.0.0.0/0
-
-# Launch 2 web server instances in different AZs
-USER_DATA=$(echo '#!/bin/bash
-yum install -y httpd
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-AZ=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone)
-echo "<h1>Hello from ${INSTANCE_ID}</h1><p>Availability Zone: ${AZ}</p>" > /var/www/html/index.html
-systemctl start httpd
-systemctl enable httpd' | base64)
-
-INSTANCE_1=$(aws ec2 run-instances \
-  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
-  --instance-type t3.micro --subnet-id ${SUBNET_1} \
-  --security-group-ids ${SG_ID} \
-  --user-data "${USER_DATA}" \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Web-AZ1}]' \
-  --query 'Instances[0].InstanceId' --output text)
-
-INSTANCE_2=$(aws ec2 run-instances \
-  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
-  --instance-type t3.micro --subnet-id ${SUBNET_2} \
-  --security-group-ids ${SG_ID} \
-  --user-data "${USER_DATA}" \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=Web-AZ2}]' \
-  --query 'Instances[0].InstanceId' --output text)
-
-echo "Instance 1: ${INSTANCE_1} (AZ1)"
-echo "Instance 2: ${INSTANCE_2} (AZ2)"
+### Get resource IDs for the demo
+```bash
+INSTANCE_1=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='Instance1Id'].OutputValue" --output text)
+INSTANCE_2=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='Instance2Id'].OutputValue" --output text)
+VPC_ID=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='VPCId'].OutputValue" --output text)
+SUBNET_1=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet1Id'].OutputValue" --output text)
+SUBNET_2=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet2Id'].OutputValue" --output text)
+ALB_SG=$(aws cloudformation describe-stacks --stack-name mod07-demo --query "Stacks[0].Outputs[?OutputKey=='ALBSecurityGroupId'].OutputValue" --output text)
 ```
 
 ---
@@ -67,7 +47,7 @@ echo "Instance 2: ${INSTANCE_2} (AZ2)"
 ALB_ARN=$(aws elbv2 create-load-balancer \
   --name demo-ha-alb \
   --subnets ${SUBNET_1} ${SUBNET_2} \
-  --security-groups ${SG_ID} \
+  --security-groups ${ALB_SG} \
   --query 'LoadBalancers[0].LoadBalancerArn' --output text)
 
 # Get the DNS name
@@ -164,12 +144,8 @@ aws elbv2 delete-listener --listener-arn ${LISTENER_ARN}
 aws elbv2 delete-target-group --target-group-arn ${TG_ARN}
 aws elbv2 delete-load-balancer --load-balancer-arn ${ALB_ARN}
 
-# Terminate instances
-aws ec2 terminate-instances --instance-ids ${INSTANCE_1} ${INSTANCE_2}
-
-# Wait then delete security group
-sleep 60
-aws ec2 delete-security-group --group-id ${SG_ID}
+# Delete the stack (removes instances and security groups)
+aws cloudformation delete-stack --stack-name mod07-demo
 ```
 
 ---

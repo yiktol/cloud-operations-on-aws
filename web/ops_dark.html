@@ -1,0 +1,1529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Cloud Operations on AWS</title>
+  <link rel="icon" type="image/x-icon" href="aws.svg">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8">
+  <style>
+    :root {
+      /* Dark Theme AWS Color Palette */
+      --aws-primary: #232F3E;
+      --aws-secondary: #FF9900;
+      --aws-light-blue: #4A90E2;
+      --aws-accent: #1A73E8;
+      --aws-success: #00D4AA;
+      --aws-warning: #FFB84D;
+      --aws-error: #FF6B6B;
+      
+      /* Dark Theme Colors */
+      --bg-primary: #0F1419;
+      --bg-secondary: #1A1F2E;
+      --bg-tertiary: #252D42;
+      --bg-card: #1E2435;
+      --bg-hover: #2A3446;
+      
+      --text-primary: #FFFFFF;
+      --text-secondary: #B4BCD0;
+      --text-muted: #8892B0;
+      --text-accent: #64FFDA;
+      
+      --border-primary: #2D3748;
+      --border-secondary: #4A5568;
+      --border-accent: #FF9900;
+      
+      /* Enhanced Variables */
+      --border-radius: 16px;
+      --border-radius-sm: 8px;
+      --border-radius-lg: 24px;
+      --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      --box-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --box-shadow-glow: 0 0 20px rgba(255, 153, 0, 0.2);
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      --card-gap: 28px;
+      
+      /* Gradients */
+      --gradient-primary: linear-gradient(135deg, #0F1419 0%, #1A1F2E 100%);
+      --gradient-secondary: linear-gradient(135deg, #1E2435 0%, #252D42 100%);
+      --gradient-accent: linear-gradient(135deg, #FF9900 0%, #FFB84D 100%);
+      --gradient-hover: linear-gradient(135deg, #2A3446 0%, #3A4A5C 100%);
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Amazon Ember', 'SF Pro Display', system-ui, sans-serif;
+      background: var(--gradient-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      min-height: 100vh;
+      font-weight: 400;
+      overflow-x: hidden;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: var(--bg-secondary);
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: var(--aws-secondary);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--aws-warning);
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    
+    /* Header styles */
+    .header {
+      background: linear-gradient(135deg, var(--aws-primary) 0%, #1A202C 100%);
+      padding: 24px 0;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    
+    .header::before {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--gradient-accent);
+    }
+    
+    .header-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    
+    .logo-title {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .logo img {
+      height: 44px;
+      filter: brightness(0) invert(1);
+      transition: var(--transition);
+    }
+    
+    .logo:hover img {
+      transform: scale(1.1);
+      filter: brightness(0) invert(1) drop-shadow(0 0 10px rgba(255, 153, 0, 0.5));
+    }
+    
+    .header h1 {
+      color: var(--text-primary);
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    
+    .header-badge {
+      background: var(--gradient-accent);
+      color: var(--text-primary);
+      padding: 10px 20px;
+      border-radius: 25px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      animation: pulse 3s infinite;
+      box-shadow: var(--box-shadow-glow);
+      letter-spacing: 0.5px;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+      }
+      50% { 
+        opacity: 0.9; 
+        transform: scale(1.02);
+      }
+    }
+    
+    /* Main content */
+    main {
+      padding: 48px 0;
+      background: var(--gradient-primary);
+    }
+    
+    /* Tab Navigation */
+    .tab-container {
+      background: var(--bg-card);
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--box-shadow);
+      margin-bottom: 40px;
+      border: 1px solid var(--border-primary);
+    }
+    
+    .tab-nav {
+      display: flex;
+      flex-wrap: wrap;
+      background: var(--gradient-secondary);
+      border-bottom: 2px solid var(--border-primary);
+      position: sticky;
+      top: 0;
+      z-index: 999;
+    }
+    
+    .tab-nav::-webkit-scrollbar {
+      height: 4px;
+    }
+    
+    .tab-nav::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    .tab-nav::-webkit-scrollbar-thumb {
+      background: var(--aws-secondary);
+      border-radius: 2px;
+    }
+    
+    .tab-button {
+      flex: 0 0 auto;
+      padding: 20px 32px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+      transition: var(--transition-spring);
+      position: relative;
+      white-space: nowrap;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+    }
+    
+    .tab-button:hover {
+      background: var(--gradient-hover);
+      color: var(--text-primary);
+      transform: translateY(-2px);
+    }
+    
+    .tab-button.active {
+      color: var(--text-accent);
+      background: var(--bg-card);
+      border-bottom-color: var(--aws-secondary);
+      font-weight: 500;
+      box-shadow: 0 -4px 12px rgba(255, 153, 0, 0.2);
+    }
+    
+    .tab-button .tab-icon {
+      display: inline-block;
+      margin-right: 5px;
+      font-size: 1rem;
+      vertical-align: middle;
+      transition: var(--transition);
+    }
+    
+    .tab-button:hover .tab-icon {
+      transform: scale(1);
+    }
+    
+    .tab-content {
+      padding: 35px;
+      min-height: 600px;
+      animation: fadeIn 0.6s ease;
+    }
+    
+    @keyframes fadeIn {
+      from { 
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to { 
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .tab-pane {
+      display: none;
+    }
+    
+    .tab-pane.active {
+      display: block;
+    }
+    
+    /* Architecture Grid */
+    .architecture-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+      gap: 32px;
+      margin-top: 28px;
+    }
+    
+    .architecture-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      transition: var(--transition-spring);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+    
+    .architecture-item:hover {
+      transform: translateY(-8px) scale(1.02);
+      box-shadow: var(--box-shadow-hover);
+      border-color: var(--aws-secondary);
+    }
+    
+    .architecture-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--gradient-accent);
+      transform: scaleX(0);
+      transition: transform 0.4s ease;
+    }
+    
+    .architecture-item:hover::before {
+      transform: scaleX(1);
+    }
+    
+    .architecture-header {
+      display: flex;
+      align-items: center;
+      padding: 24px;
+      background: var(--gradient-secondary);
+      border-bottom: 1px solid var(--border-primary);
+    }
+    
+    .architecture-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      background: var(--gradient-accent);
+      color: var(--text-primary);
+      font-weight: 800;
+      font-size: 1.3rem;
+      border-radius: 50%;
+      margin-right: 20px;
+      box-shadow: var(--box-shadow-glow);
+      border: 2px solid rgba(255, 153, 0, 0.3);
+    }
+    
+    .architecture-title {
+      flex: 1;
+      font-weight: 700;
+      color: var(--text-primary);
+      font-size: 1.2rem;
+      line-height: 1.3;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    }
+    
+    .architecture-image {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      background: var(--bg-secondary);
+      cursor: zoom-in;
+      border-bottom: 1px solid var(--border-primary);
+    }
+    
+    .architecture-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      transition: var(--transition);
+      filter: brightness(0.95) contrast(1.1);
+    }
+    
+    .architecture-image:hover img {
+      transform: scale(1.08);
+      filter: brightness(1) contrast(1.2);
+    }
+    
+    .architecture-content {
+      padding: 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    
+    .description {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text-secondary);
+      flex: 1;
+      font-weight: 400;
+    }
+    
+    /* Demo links */
+    .demo-links,
+    .demo-links-x {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-primary);
+    }
+    
+    .demo-button {
+      display: inline-flex;
+      align-items: center;
+      background: var(--gradient-secondary);
+      color: var(--text-secondary);
+      padding: 12px 18px;
+      border-radius: var(--border-radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: var(--transition-spring);
+      border: 1px solid var(--border-secondary);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .demo-button::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 153, 0, 0.1), transparent);
+      transition: left 0.5s;
+    }
+    
+    .demo-button:hover {
+      background: var(--gradient-accent);
+      color: var(--text-primary);
+      transform: translateY(-3px);
+      box-shadow: var(--box-shadow-glow);
+      border-color: var(--aws-secondary);
+    }
+    
+    .demo-button:hover::after {
+      left: 100%;
+    }
+    
+    .demo-button::before {
+      content: "→";
+      margin-right: 8px;
+      font-weight: bold;
+      transition: var(--transition);
+    }
+    
+    .demo-button:hover::before {
+      transform: translateX(3px) scale(1.2);
+    }
+    
+    /* Stats Section */
+    .stats-section {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    
+    .stat-card {
+      background: var(--bg-card);
+      border-radius: var(--border-radius);
+      padding: 28px;
+      text-align: center;
+      box-shadow: var(--box-shadow);
+      transition: var(--transition-spring);
+      border: 1px solid var(--border-primary);
+    }
+    
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--box-shadow-hover);
+      border-color: var(--aws-secondary);
+    }
+    
+    .stat-number {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--text-accent);
+      margin-bottom: 12px;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+    
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+    
+    /* Footer */
+    footer {
+      background: linear-gradient(135deg, var(--aws-primary) 0%, #1A202C 100%);
+      color: var(--text-primary);
+      text-align: center;
+      padding: 40px 0;
+      margin-top: 80px;
+      font-size: 0.95rem;
+      border-top: 1px solid var(--border-primary);
+    }
+    
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 2000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.95);
+      justify-content: center;
+      align-items: center;
+      animation: fadeIn 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+    
+    .modal-content {
+      max-width: 95%;
+      max-height: 90vh;
+      border-radius: var(--border-radius);
+      box-shadow: 0 25px 80px rgba(0, 0, 0, 0.7);
+      animation: zoomIn 0.4s ease;
+      border: 2px solid var(--border-secondary);
+    }
+    
+    @keyframes zoomIn {
+      from {
+        transform: scale(0.7);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+    
+    .close {
+      position: absolute;
+      top: 30px;
+      right: 50px;
+      color: var(--text-primary);
+      font-size: 32px;
+      font-weight: 300;
+      cursor: pointer;
+      transition: var(--transition-spring);
+      background: rgba(0, 0, 0, 0.7);
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      border: 2px solid var(--border-secondary);
+    }
+    
+    .close:hover {
+      background: var(--aws-secondary);
+      transform: rotate(90deg) scale(1.1);
+      box-shadow: var(--box-shadow-glow);
+    }
+    
+    /* Loading spinner */
+    .loading-spinner {
+      width: 56px;
+      height: 56px;
+      border: 4px solid rgba(255, 153, 0, 0.2);
+      border-radius: 50%;
+      border-top-color: var(--aws-secondary);
+      animation: spin 1s ease-in-out infinite;
+      margin: 50px auto;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Selection styles */
+    ::selection {
+      background: var(--aws-secondary);
+      color: var(--text-primary);
+    }
+    
+    ::-moz-selection {
+      background: var(--aws-secondary);
+      color: var(--text-primary);
+    }
+    
+    /* Focus styles for accessibility */
+    .tab-button:focus,
+    .demo-button:focus {
+      outline: 2px solid var(--aws-secondary);
+      outline-offset: 2px;
+    }
+    
+    /* Responsive */
+    @media screen and (max-width: 768px) {
+      .header h1 {
+        font-size: 1.3rem;
+      }
+      
+      .tab-button {
+        padding: 16px 24px;
+        font-size: 0.9rem;
+      }
+      
+      .architecture-grid {
+        grid-template-columns: 1fr;
+        gap: 24px;
+      }
+      
+      .stats-section {
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+      
+      .tab-content {
+        padding: 24px;
+      }
+      
+      .architecture-number {
+        width: 48px;
+        height: 48px;
+        font-size: 1.1rem;
+      }
+    }
+    
+    @media screen and (max-width: 480px) {
+      .header-badge {
+        display: none;
+      }
+      
+      .stats-section {
+        grid-template-columns: 1fr;
+      }
+      
+      .architecture-header {
+        padding: 20px;
+      }
+      
+      .architecture-number {
+        width: 44px;
+        height: 44px;
+        font-size: 1rem;
+      }
+      
+      .architecture-title {
+        font-size: 1.1rem;
+      }
+      
+      .tab-button {
+        padding: 14px 20px;
+      }
+      
+      .demo-button {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+      }
+    }
+    
+    /* Smooth scrolling for the entire page */
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    /* Additional hover effects for better interactivity */
+    .architecture-item:hover .architecture-number {
+      transform: rotate(360deg);
+      box-shadow: 0 0 25px rgba(255, 153, 0, 0.4);
+    }
+    
+    .architecture-item:hover .architecture-title {
+      color: var(--text-accent);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="container header-container">
+      <div class="logo-title">
+        <a href="#" class="logo">
+          <img src="logo.png" alt="AWS">
+        </a>
+        <h1>Cloud Operations on AWS</h1>
+      </div>
+      <span class="header-badge">AWS Certified CloudOps Engineer - Associate</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <!-- Tab Container -->
+      <div class="tab-container">
+        <div class="tab-nav">
+          <button class="tab-button active" onclick="openTab(event, 'regional')">
+            <span class="tab-icon">🌏</span>Regional Deployments
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'routing')">
+            <span class="tab-icon">🔀</span>Traffic Routing
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'modern')">
+            <span class="tab-icon">⚡</span>Modern Architecture
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'security')">
+            <span class="tab-icon">🛡️</span>Security & CDN
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'iac')">
+            <span class="tab-icon">🏗️</span>Infrastructure as Code
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'storage')">
+            <span class="tab-icon">💾</span>Storage Services
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'modules')">
+            <span class="tab-icon">📚</span>Course Modules
+          </button>
+          <button class="tab-button" onclick="openTab(event, 'myclass')">
+            <span class="tab-icon">🎓</span>MyClass
+          </button>
+        </div>
+
+        <div class="tab-content">
+          <!-- Regional Deployments Tab -->
+          <div id="regional" class="tab-pane active">
+            <div class="architecture-grid">
+              <!-- Singapore Region -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">01</div>
+                  <h3 class="architecture-title">CoffeeShop Singapore</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_sg_v2.png" alt="Singapore Region" class="diagram-image" data-full="img/coffeeshop_sg_v2.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Multi-AZ deployment in Singapore (ap-southeast-1) featuring Application Load Balancer distributing traffic across three availability zones, mixed instance types (on-demand and spot), and RDS Multi-AZ for high availability database operations.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://sg.aws.yikyakyuk.com/" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://sg.aws.yikyakyuk.com/metadata.php" target="_blank" class="demo-button">Metadata</a></li>
+                    <li><a href="https://sg.aws.yikyakyuk.com/get-dashboard.php" target="_blank" class="demo-button">Dashboard</a></li>
+                    <li><a href="https://sg.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/stress-tool/" target="_blank" class="demo-button">Stress Tool</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Sydney Region -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">02</div>
+                  <h3 class="architecture-title">CoffeeShop Sydney</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_au.png" alt="Sydney Region" class="diagram-image" data-full="img/coffeeshop_au.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Australia East (ap-southeast-2) regional deployment showcasing resilient architecture across three availability zones with Application Load Balancer, Auto Scaling Groups, mixed instance types for cost optimization, and RDS Multi-AZ configuration.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://au.aws.yikyakyuk.com/" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://au.aws.yikyakyuk.com/metadata.php" target="_blank" class="demo-button">Metadata</a></li>
+                    <li><a href="https://au.aws.yikyakyuk.com/get-dashboard.php" target="_blank" class="demo-button">Dashboard</a></li>
+                    <li><a href="https://au.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/stress-tool/" target="_blank" class="demo-button">Stress Tool</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Mumbai Region -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">03</div>
+                  <h3 class="architecture-title">CoffeeShop Mumbai</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_in.png" alt="Mumbai Region" class="diagram-image" data-full="img/coffeeshop_in.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Asia Pacific Mumbai (ap-south-1) deployment demonstrating multi-AZ resilience with Application Load Balancer managing traffic distribution, Auto Scaling capabilities for dynamic workloads, and highly available RDS Multi-AZ database setup.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://in.aws.yikyakyuk.com/" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://in.aws.yikyakyuk.com/metadata.php" target="_blank" class="demo-button">Metadata</a></li>
+                    <li><a href="https://in.aws.yikyakyuk.com/get-dashboard.php" target="_blank" class="demo-button">Dashboard</a></li>
+                    <li><a href="https://in.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/stress-tool/" target="_blank" class="demo-button">Stress Tool</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Traffic Routing Tab -->
+          <div id="routing" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- Route 53 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">04</div>
+                  <h3 class="architecture-title">Route 53 Routing Architecture</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_route53.png" alt="Route 53" class="diagram-image" data-full="img/coffeeshop_route53.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Comprehensive DNS routing solution using Amazon Route 53 with multiple routing policies including geolocation for regional targeting, latency-based routing for performance optimization, failover routing for disaster recovery, and weighted routing for A/B testing scenarios.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/failover/metadata.php" target="_blank" class="demo-button">Failover</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/weighted/metadata.php" target="_blank" class="demo-button">Weighted</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/latency/metadata.php" target="_blank" class="demo-button">Latency</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/geolocation/metadata.php" target="_blank" class="demo-button">Geolocation</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/fis-experiment/" target="_blank" class="demo-button">Start Experiment</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Global Accelerator -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">05</div>
+                  <h3 class="architecture-title">Global Accelerator</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_ga.png" alt="Global Accelerator" class="diagram-image" data-full="img/coffeeshop_ga.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">AWS Global Accelerator implementation leveraging AWS global network infrastructure to route user traffic through optimal edge locations to regional endpoints, integrated with Transit Gateway for seamless multi-region connectivity and improved application performance.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ga.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://ga.aws.yikyakyuk.com/metadata.php" target="_blank" class="demo-button">Metadata</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- VPC -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">06</div>
+                  <h3 class="architecture-title">Virtual Private Cloud</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/vpc.png" alt="Virtual Private Cloud" class="diagram-image" data-full="img/vpc.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Foundational VPC architecture demonstrating network segmentation with public and private subnets, Internet Gateway for public connectivity, NAT Gateway for secure outbound access from private resources, and proper routing table configurations for network isolation and security.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://demo.aws.yikyakyuk.com/pinger/" target="_blank" class="demo-button">Pinger</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- VPC Peering -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">07</div>
+                  <h3 class="architecture-title">VPC Peering</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/vpc-peering.png" alt="VPC Peering" class="diagram-image" data-full="img/vpc-peering.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Inter-region VPC Peering connections enabling secure, direct network connectivity between VPCs across Singapore, Sydney, and Mumbai regions, facilitating cross-region communication without traversing the public internet while maintaining network isolation.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-0f9d59bbe6285e7d0?region=ap-southeast-1" target="_blank" class="demo-button">Singapore</a></li>
+                    <li><a href="https://ap-south-1.console.aws.amazon.com/systems-manager/session-manager/i-012c4d66016d5f4b3?region=ap-south-1" target="_blank" class="demo-button">Mumbai</a></li>
+                    <li><a href="https://ap-southeast-2.console.aws.amazon.com/systems-manager/session-manager/i-0bb11cc16b7aa0449?region=ap-southeast-2" target="_blank" class="demo-button">Sydney</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Modern Architecture Tab -->
+          <div id="modern" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- CI/CD Pipeline -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">08</div>
+                  <h3 class="architecture-title">CI/CD Pipeline</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/cicd.png" alt="CI/CD Pipeline" class="diagram-image" data-full="img/cicd.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">End-to-end DevOps pipeline leveraging AWS CodeCommit for source control, CodeBuild for automated building and testing, and CodePipeline orchestrating continuous deployment to containerized applications running on Amazon ECS Fargate for serverless container execution.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://cicd.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://cicd.aws.yikyakyuk.com/healthcheck" target="_blank" class="demo-button">Health</a></li>
+                    <li><a href="https://cicd.aws.yikyakyuk.com/order" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://cloudwatch.amazonaws.com/dashboard.html?dashboard=coffeeshop-dashboard&context=eyJSIjoidXMtZWFzdC0xIiwiRCI6ImN3LWRiLTg3NTY5MjYwODk4MSIsIlUiOiJ1cy1lYXN0LTFfU0NUNmVEM1h0IiwiQyI6IjVxMm9xdjA2M3V2MHAydWhzdWZuMXVrZ2pzIiwiSSI6InVzLWVhc3QtMTo4ODczOWQ5OC1kMDE3LTQ0ZjctYjk1OS05ZmNmNWJlOWVlNDMiLCJPIjoiYXJuOmF3czppYW06Ojg3NTY5MjYwODk4MTpyb2xlL3NlcnZpY2Utcm9sZS9DV0RCU2hhcmluZy1QdWJsaWNSZWFkT25seUFjY2Vzcy1JUTdEQjNPVCIsIk0iOiJQdWJsaWMifQ==&start=PT3H&end=null" target="_blank" class="demo-button">Dashboard</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Serverless -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">09</div>
+                  <h3 class="architecture-title">Serverless Architecture</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/serverless.png" alt="Serverless" class="diagram-image" data-full="img/serverless.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Comprehensive serverless solution utilizing API Gateway for RESTful APIs, AWS Lambda for compute functions, DynamoDB for NoSQL data storage, S3 for static content hosting, CloudFront for global content delivery, with SNS and SQS for decoupled messaging patterns.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://serverless.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://serverless.aws.yikyakyuk.com/orderhere.html" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/sales-generator/" target="_blank" class="demo-button">Order Generator</a></li>
+                    <li><a href="https://cloudwatch.amazonaws.com/dashboard.html?dashboard=Serverless&context=eyJSIjoidXMtZWFzdC0xIiwiRCI6ImN3LWRiLTg3NTY5MjYwODk4MSIsIlUiOiJ1cy1lYXN0LTFfU0NUNmVEM1h0IiwiQyI6IjVxMm9xdjA2M3V2MHAydWhzdWZuMXVrZ2pzIiwiSSI6InVzLWVhc3QtMTpkMWIyMzE2Zi1lNmM2LTQyZWUtOTAwNC02NDQ5MmQwNDdkMmIiLCJNIjoiUHVibGljIn0=" target="_blank" class="demo-button">Dashboard</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- The Coffeeshop -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">10</div>
+                  <h3 class="architecture-title">The CoffeeShop Architecture</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop.png" alt="The CoffeeShop" class="diagram-image" data-full="img/coffeeshop.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Complete CoffeeShop application architecture demonstrating modern cloud-native patterns with containerized microservices, managed databases, content delivery networks, and integrated monitoring and logging solutions for production-ready applications.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://cicd.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://cicd.aws.yikyakyuk.com/order" target="_blank" class="demo-button">Order</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/sales-generator/" target="_blank" class="demo-button">Order Generator</a></li>
+                    <li><a href="https://cloudwatch.amazonaws.com/dashboard.html?dashboard=Serverless&context=eyJSIjoidXMtZWFzdC0xIiwiRCI6ImN3LWRiLTg3NTY5MjYwODk4MSIsIlUiOiJ1cy1lYXN0LTFfU0NUNmVEM1h0IiwiQyI6IjVxMm9xdjA2M3V2MHAydWhzdWZuMXVrZ2pzIiwiSSI6InVzLWVhc3QtMTpkMWIyMzE2Zi1lNmM2LTQyZWUtOTAwNC02NDQ5MmQwNDdkMmIiLCJNIjoiUHVibGljIn0=" target="_blank" class="demo-button">Dashboard</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Aurora Global DB -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">11</div>
+                  <h3 class="architecture-title">Amazon Aurora Global Database</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/globaldb.png" alt="Aurora Global Database" class="diagram-image" data-full="img/globaldb.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Amazon Aurora Global Database implementation providing cross-region disaster recovery and low-latency global reads with primary region writes replicating to secondary regions within seconds, enabling globally distributed applications with local read performance.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://sg.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Singapore Order</a></li>
+                    <li><a href="https://au.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Sydney Order</a></li>
+                    <li><a href="https://in.aws.yikyakyuk.com/order.php" target="_blank" class="demo-button">Mumbai Order</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- AWS X-Ray and Microservices -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">12</div>
+                  <h3 class="architecture-title">AWS X-Ray and Microservices</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/microservices.png" alt="AWS X-Ray and Microservices" class="diagram-image" data-full="img/microservices.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Distributed tracing implementation using AWS X-Ray for microservices observability, providing end-to-end request tracking, performance bottleneck identification, and service dependency mapping across complex distributed application architectures.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://x-ray.aws.yikyakyuk.com" target="_blank" class="demo-button">AWS X-Ray and Microservices</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security & CDN Tab -->
+          <div id="security" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- CloudFront -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">13</div>
+                  <h3 class="architecture-title">CloudFront CDN</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/coffeeshop_cloudfront.png" alt="CloudFront" class="diagram-image" data-full="img/coffeeshop_cloudfront.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Amazon CloudFront content delivery network configuration optimizing global performance by serving static assets from S3 origins and dynamic content through Application Load Balancer origins, with edge caching reducing latency worldwide.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://cdn.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- WAF -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">14</div>
+                  <h3 class="architecture-title">WAF Security</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/waf_cf.png" alt="WAF with CloudFront" class="diagram-image" data-full="img/waf_cf.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Comprehensive web application security implementation using AWS WAF integrated with CloudFront and AWS Shield for DDoS protection, featuring custom rules for SQL injection prevention, XSS filtering, and geographic restrictions for enhanced security posture.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com" target="_blank" class="demo-button">Homepage</a></li>
+                    <li><a href="https://cdn.aws.yikyakyuk.com/honeypot" target="_blank" class="demo-button">Honeypot</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/?user=%3Cscript%3E%3Calert%3EHello%3E%3C/alert%3E%3C/script%3E" target="_blank" class="demo-button">XSS Test</a></li>
+                    <li><a href="https://coffeeshop.aws.yikyakyuk.com/?user=%27AND%201=1;" target="_blank" class="demo-button">SQLi Test</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- KMS -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">15</div>
+                  <h3 class="architecture-title">AWS Key Management Service</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/kms.png" alt="Encryption/Decryption using AWS Key Management Service" class="diagram-image" data-full="img/kms.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">AWS Key Management Service (KMS) implementation showcasing encryption and decryption operations with customer-managed keys, demonstrating key policies, IAM permissions, and secure data protection patterns for compliance and data sovereignty requirements.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://demo.aws.yikyakyuk.com/kms-app/" target="_blank" class="demo-button">Policy Interpretation</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/kms-app-2/" target="_blank" class="demo-button">Encrypt/Decrypt</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- IaC Tab -->
+          <div id="iac" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- AWS CloudFormation -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">16</div>
+                  <h3 class="architecture-title">AWS CloudFormation</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/cloudformation.png" alt="IaC with AWS CloudFormation" class="diagram-image" data-full="img/cloudformation.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Infrastructure as Code implementation using AWS CloudFormation for consistent, repeatable multi-regional deployments across Mumbai, Jakarta, Melbourne, and Seoul, demonstrating template reusability and infrastructure version control.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://demo.aws.yikyakyuk.com/mumbai/metadata.php" target="_blank" class="demo-button">Mumbai</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/jakarta/metadata.php" target="_blank" class="demo-button">Jakarta</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/melbourne/metadata.php" target="_blank" class="demo-button">Melbourne</a></li>
+                    <li><a href="https://demo.aws.yikyakyuk.com/seoul/metadata.php" target="_blank" class="demo-button">Seoul</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- AWS CloudFormation Nested Stack -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">17</div>
+                  <h3 class="architecture-title">CloudFormation Nested Stacks</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/nested_stack.png" alt="IaC with AWS CloudFormation Nested Stack" class="diagram-image" data-full="img/nested_stack.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Advanced CloudFormation architecture using nested stacks for modular infrastructure deployment, separating concerns across VPC, compute, and networking layers while maintaining dependencies and enabling reusable, maintainable infrastructure templates.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://accelerator.aws.yikyakyuk.com/metadata.php" target="_blank" class="demo-button">via Global Accelerator</a></li>
+                    <li><a href="iac/vpc.yaml" target="_blank" class="demo-button">Download the VPC Stack</a></li>
+                    <li><a href="iac/instance.yaml" target="_blank" class="demo-button">Download the Instance/ALB Stack</a></li>
+                    <li><a href="iac/accelerator.yaml" target="_blank" class="demo-button">Download the Accelerator Stack</a></li>
+                    <li><a href="iac/main.yaml" target="_blank" class="demo-button">Download the Main Stack</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Storage Tab -->
+          <div id="storage" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- Amazon Data Lifecycle Manager  -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">18</div>
+                  <h3 class="architecture-title">Amazon Data Lifecycle Manager</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/dlm.png" alt="Amazon Data Lifecycle Manager " class="diagram-image" data-full="img/dlm.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Automate the creation, retention, copy and deletion of snapshots and AMIs. Amazon Data Lifecycle Manager provides a simple, automated way to back up data stored on Amazon EBS volumes.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-094140c9de77522bb?region=ap-southeast-1" target="_blank" class="demo-button">DLM-EC2-Instance</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Amazon FSx and Microsoft AD -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">19</div>
+                  <h3 class="architecture-title">Amazon FSx and Microsoft AD</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/windows_fsx_ad.png" alt="Amazon FSx and Microsoft AD" class="diagram-image" data-full="img/windows_fsx_ad.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Enterprise Windows environment featuring Amazon FSx for Windows File Server integrated with AWS Managed Microsoft Active Directory, providing high-performance, fully managed shared storage with native Windows features and seamless domain integration.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/fleet-manager/remote-desktop?nodeIds=i-0c174010b7b2fc612&region=ap-southeast-1&authType=USER_CREDENTIALS" target="_blank" class="demo-button">Windows Server</a></li>
+                  </ul>
+                </div>
+              </div>
+
+
+              <!-- Amazon ElastiCache Serverless-->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">20</div>
+                  <h3 class="architecture-title">Amazon ElastiCache Serverless</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/elasticache.png" alt="Amazon ElastiCache Serverless" class="diagram-image" data-full="img/elasticache.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Delivers real-time performance, and enables applications to scale instantly. ElastiCache is compatible with three open-source caching solutions: Valkey, Memcached and Redis OSS.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://demo.aws.yikyakyuk.com/redis/" target="_blank" class="demo-button">Redis</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Amazon EFS -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">21</div>
+                  <h3 class="architecture-title">Amazon Elastic File System</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/efs.png" alt="Amazon EFS" class="diagram-image" data-full="img/efs.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Amazon Elastic File System (EFS) implementation providing scalable, shared NFS storage accessible across multiple EC2 instances and availability zones, demonstrating concurrent access patterns and automatic scaling capabilities for distributed workloads.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-0d9acdd6758208e7b?region=ap-southeast-1" target="_blank" class="demo-button">Ubuntu-EFS-Instance</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Course Modules Tab -->
+          <div id="modules" class="tab-pane">
+            <div class="architecture-grid">
+              <!-- Module 01 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">01</div>
+                  <h3 class="architecture-title">Well-Architected Framework</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod01-well-architected.png" alt="Module 01 - Well-Architected" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod01-well-architected.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Introduction to Cloud Operations and the AWS Well-Architected Framework. Covers the six pillars: Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, and Sustainability.</p>
+                </div>
+              </div>
+
+              <!-- Module 02 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">02</div>
+                  <h3 class="architecture-title">Access Management</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod02-access-management.png" alt="Module 02 - Access Management" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod02-access-management.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">IAM policy evaluation demonstrating implicit deny, explicit allow, and explicit deny. Covers IAM users, policies, roles, and the principle that Deny always wins.</p>
+                </div>
+              </div>
+
+              <!-- Module 03 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">03</div>
+                  <h3 class="architecture-title">System Discovery</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod03-system-discovery.png" alt="Module 03 - System Discovery" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod03-system-discovery.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Discover and inventory your AWS environment using Systems Manager Session Manager, SSM Inventory for instance internals, and AWS Config for continuous compliance monitoring.</p>
+                </div>
+              </div>
+
+              <!-- Module 04 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">04</div>
+                  <h3 class="architecture-title">Deploy and Update Resources</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod04-deploy-update.png" alt="Module 04 - Deploy and Update" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod04-deploy-update.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Resource tagging strategies, Golden AMI creation for consistent deployments, and immutable infrastructure patterns. Tag, Image, Deploy workflow for operational excellence.</p>
+                </div>
+              </div>
+
+              <!-- Module 05 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">05</div>
+                  <h3 class="architecture-title">Automate Resource Deployment</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod05-automate-deployment.png" alt="Module 05 - Automate Deployment" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod05-automate-deployment.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Infrastructure as Code with AWS CloudFormation. Template validation, stack deployment, drift detection, and change sets for safe infrastructure updates across environments.</p>
+                </div>
+              </div>
+
+              <!-- Module 06 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">06</div>
+                  <h3 class="architecture-title">Manage Resources</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod06-manage-resources.png" alt="Module 06 - Manage Resources" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod06-manage-resources.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Operations as Code with AWS Systems Manager. Run Command for remote execution at scale, Parameter Store for secrets management, and Maintenance Windows for scheduled patching.</p>
+                </div>
+              </div>
+
+              <!-- Module 07 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">07</div>
+                  <h3 class="architecture-title">High Availability</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod07-high-availability.png" alt="Module 07 - High Availability" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod07-high-availability.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Configure highly available systems with Application Load Balancer distributing traffic across multiple Availability Zones with health checks and automatic failover.</p>
+                </div>
+              </div>
+
+              <!-- Module 08 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">08</div>
+                  <h3 class="architecture-title">Automate Scaling</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod08-automate-scaling.png" alt="Module 08 - Automate Scaling" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod08-automate-scaling.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Auto Scaling with target tracking policies. CloudWatch monitors CPU utilization and triggers scale-out/in actions using Launch Templates across multiple Availability Zones.</p>
+                </div>
+              </div>
+
+              <!-- Module 09 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">09</div>
+                  <h3 class="architecture-title">Monitoring</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod09-monitoring.png" alt="Module 09 - Monitoring" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod09-monitoring.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">CloudWatch monitoring pipeline with metrics, alarms, and centralized logs. Metric filters detect error patterns and trigger SNS notifications for operational awareness.</p>
+                </div>
+              </div>
+
+              <!-- Module 10 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">10</div>
+                  <h3 class="architecture-title">Security & Auditing</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod10-security-auditing.png" alt="Module 10 - Security Auditing" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod10-security-auditing.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Detect, Alert, Remediate pipeline using CloudTrail for audit logging, EventBridge for real-time rules, AWS Config for compliance, and SSM Automation for auto-remediation.</p>
+                </div>
+              </div>
+
+              <!-- Module 11 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">11</div>
+                  <h3 class="architecture-title">Secure Networks</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod11-secure-networks.png" alt="Module 11 - Secure Networks" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod11-secure-networks.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">VPC security layers with Internet Gateway, NACLs (stateless), Security Groups (stateful), public/private subnet isolation, and VPC Flow Logs for traffic forensics.</p>
+                </div>
+              </div>
+
+              <!-- Module 12 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">12</div>
+                  <h3 class="architecture-title">Mountable Storage</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod12-mountable-storage.png" alt="Module 12 - Mountable Storage" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod12-mountable-storage.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">EBS volumes (gp3, io2), incremental snapshots, Data Lifecycle Manager for automation, and Amazon EFS for shared NFS storage across multiple instances and Availability Zones.</p>
+                </div>
+              </div>
+
+              <!-- Module 13 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">13</div>
+                  <h3 class="architecture-title">Object Storage</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod13-object-storage.png" alt="Module 13 - Object Storage" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod13-object-storage.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">S3 lifecycle management with automatic transitions from Standard to Standard-IA to Glacier. Versioning for data protection and lifecycle policies for cost optimization.</p>
+                </div>
+              </div>
+
+              <!-- Module 14 -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">14</div>
+                  <h3 class="architecture-title">Cost Optimization</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="https://training.yikyakyuk.com/ops/img/mod14-cost-optimization.png" alt="Module 14 - Cost Optimization" class="diagram-image" data-full="https://training.yikyakyuk.com/ops/img/mod14-cost-optimization.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Cost awareness with Cost Explorer, control with AWS Budgets and billing alarms, and optimization with Trusted Advisor and Compute Optimizer for rightsizing recommendations.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MyClass Tab -->
+          <div id="myclass" class="tab-pane">
+            <div class="architecture-grid">
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">🎓</div>
+                  <h3 class="architecture-title">MyClass</h3>
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Access your AWS Skill Builder classroom for course materials, quizzes, and progress tracking.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://myclass.skillbuilder.aws" target="_blank" class="demo-button">MyClass</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">🧪</div>
+                  <h3 class="architecture-title">Lab Access</h3>
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Access your hands-on lab environments through AWS Training classrooms.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://classrooms.aws.training" target="_blank" class="demo-button">Lab Access</a></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Image Modal -->
+  <div id="imageModal" class="modal">
+    <span class="close">&times;</span>
+    <img class="modal-content" id="expandedImg">
+  </div>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2025 Amazon Web Services, Inc. or its affiliates. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    // Tab functionality
+    function openTab(evt, tabName) {
+      const tabPanes = document.getElementsByClassName('tab-pane');
+      const tabButtons = document.getElementsByClassName('tab-button');
+      
+      // Hide all tab panes
+      for (let pane of tabPanes) {
+        pane.classList.remove('active');
+      }
+      
+      // Remove active class from all buttons
+      for (let button of tabButtons) {
+        button.classList.remove('active');
+      }
+      
+      // Show selected tab and mark button as active
+      document.getElementById(tabName).classList.add('active');
+      evt.currentTarget.classList.add('active');
+      
+      // Scroll to top of tab content
+      document.querySelector('.tab-container').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    
+    // Modal functionality
+    const modal = document.getElementById('imageModal');
+    const modalImg = document.getElementById('expandedImg');
+    const closeBtn = document.getElementsByClassName('close')[0];
+    
+    // Get all architecture diagram images
+    const diagrams = document.querySelectorAll('.diagram-image');
+    
+    // Add click event to all diagrams
+    diagrams.forEach(diagram => {
+      diagram.addEventListener('click', function() {
+        modal.style.display = "flex";
+        modalImg.src = this.getAttribute('data-full') || this.src;
+      });
+    });
+    
+    // Close modal when clicking X
+    closeBtn.onclick = function() {
+      modal.style.display = "none";
+    }
+    
+    // Close modal when clicking outside the image
+    modal.onclick = function(event) {
+      if (event.target === modal) {
+        modal.style.display = "none";
+      }
+    }
+    
+    // Close modal with ESC key
+    document.addEventListener('keydown', function(event) {
+      if (event.key === "Escape" && modal.style.display === "flex") {
+        modal.style.display = "none";
+      }
+    });
+    
+    // Lazy loading implementation
+    document.addEventListener('DOMContentLoaded', function() {
+      if ('IntersectionObserver' in window) {
+        const imgObserver = new IntersectionObserver((entries, observer) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const img = entry.target;
+              if (img.dataset.src) {
+                img.src = img.dataset.src;
+                observer.unobserve(img);
+              }
+            }
+          });
+        }, {
+          rootMargin: '50px'
+        });
+        
+        document.querySelectorAll('img[data-src]').forEach(img => {
+          imgObserver.observe(img);
+        });
+      }
+    });
+    
+    // Add keyboard navigation for tabs
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const activeButton = document.querySelector('.tab-button.active');
+        const allButtons = Array.from(document.querySelectorAll('.tab-button'));
+        const currentIndex = allButtons.indexOf(activeButton);
+        
+        let newIndex;
+        if (event.key === 'ArrowLeft') {
+          newIndex = currentIndex > 0 ? currentIndex - 1 : allButtons.length - 1;
+        } else {
+          newIndex = currentIndex < allButtons.length - 1 ? currentIndex + 1 : 0;
+        }
+        
+        allButtons[newIndex].click();
+      }
+    });
+
+    async function updateInstanceLinks(linkContainer, jsonFile) {
+        try {
+            const response = await fetch(jsonFile);
+            const instanceData = await response.json();
+            
+            linkContainer.innerHTML = '';
+            
+            instanceData.forEach(instance => {
+                const li = document.createElement('li');
+                const a = document.createElement('a');
+                
+                a.href = `https://${instance.region}.console.aws.amazon.com/systems-manager/session-manager/${instance.instanceId}?region=${instance.region}`;
+                a.target = '_blank';
+                a.className = 'demo-button';
+                a.textContent = `${instance.name} - Session Manager`;
+                
+                li.appendChild(a);
+                linkContainer.appendChild(li);
+            });
+        } catch (error) {
+            console.error('Failed to load instance configuration:', error);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const linkContainer = document.querySelector('.demo-links-x');
+        updateInstanceLinks(linkContainer, 'instances.json');
+    });
+  </script>
+</body>
+</html>

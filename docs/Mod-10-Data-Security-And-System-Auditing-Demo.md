@@ -2,18 +2,30 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
+- Module 10 CloudFormation stack deployed (`Mod-10/cfn-setup.yaml`)
 - CloudTrail enabled (default in most accounts)
+- AWS Config already enabled in the region
 
 ---
 
 ## Part 1: Setup (do before class)
 
-```bash
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=$(aws configure get region)
+### Deploy the CloudFormation stack
+The stack creates: SNS topic for security alerts (with EventBridge/CloudWatch publish permissions), and an EventBridge IAM role.
 
-# Create an SNS topic for alerts
-TOPIC_ARN=$(aws sns create-topic --name demo-security-alerts --query TopicArn --output text)
+```bash
+aws cloudformation deploy \
+  --template-file Mod-10/cfn-setup.yaml \
+  --stack-name mod10-demo \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+### Get the SNS topic ARN
+```bash
+TOPIC_ARN=$(aws cloudformation describe-stacks --stack-name mod10-demo --query "Stacks[0].Outputs[?OutputKey=='SecurityAlertsTopicArn'].OutputValue" --output text)
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Subscribe your email (confirm the subscription before class)
 aws sns subscribe --topic-arn ${TOPIC_ARN} --protocol email --notification-endpoint your-email@example.com
 ```
 
@@ -64,7 +76,7 @@ aws cloudtrail lookup-events \
 > **Say:** "CloudTrail records events. EventBridge reacts to them IN REAL TIME."
 
 ```bash
-# Create an EventBridge rule: detect when someone creates an open security group
+# Create an EventBridge rule: detect when someone modifies a security group
 aws events put-rule \
   --name "detect-open-security-group" \
   --event-pattern '{
@@ -103,15 +115,12 @@ echo "⚠️ Alert sent! Check your email (or SNS topic)."
 
 ---
 
-### 🎬 Act 3: Automated Remediation with Config + Lambda
+### 🎬 Act 3: Automated Remediation with Config Rules
 
 > **Say:** "Detection is good, but automated REMEDIATION is better. Let's auto-close insecure security group rules."
 
 ```bash
-# Show AWS Config remediation concept
-# First, check if the managed rule exists
-aws configservice describe-config-rules \
-  --config-rule-names restricted-ssh 2>/dev/null || \
+# Create a Config rule to check for open SSH
 aws configservice put-config-rule --config-rule '{
   "ConfigRuleName": "restricted-ssh",
   "Source": {
@@ -134,22 +143,6 @@ aws configservice get-compliance-details-by-config-rule \
   --compliance-types NON_COMPLIANT \
   --query 'EvaluationResults[*].EvaluationResultIdentifier.EvaluationResultQualifier.ResourceId' \
   --output table
-
-# Set up auto-remediation (revoke the offending rule)
-aws configservice put-remediation-configurations --remediation-configurations '[{
-  "ConfigRuleName": "restricted-ssh",
-  "TargetType": "SSM_DOCUMENT",
-  "TargetId": "AWS-DisablePublicAccessForSecurityGroup",
-  "Parameters": {
-    "GroupId": {"ResourceValue": {"Value": "RESOURCE_ID"}},
-    "AutomationAssumeRole": {"StaticValue": {"Values": ["arn:aws:iam::'${ACCOUNT_ID}':role/AutoRemediationRole"]}}
-  },
-  "Automatic": true,
-  "MaximumAutomaticAttempts": 3,
-  "RetryAttemptSeconds": 60
-}]'
-
-echo "Auto-remediation configured! Non-compliant SGs will be automatically fixed."
 ```
 
 > **Talking points:**
@@ -165,8 +158,10 @@ echo "Auto-remediation configured! Non-compliant SGs will be automatically fixed
 aws events remove-targets --rule "detect-open-security-group" --ids "sns-alert"
 aws events delete-rule --name "detect-open-security-group"
 aws ec2 delete-security-group --group-id ${DEMO_SG}
-aws sns delete-topic --topic-arn ${TOPIC_ARN}
-aws configservice delete-config-rule --config-rule-name restricted-ssh 2>/dev/null
+aws configservice delete-config-rule --config-rule-name restricted-ssh
+
+# Delete the stack
+aws cloudformation delete-stack --stack-name mod10-demo
 ```
 
 ---

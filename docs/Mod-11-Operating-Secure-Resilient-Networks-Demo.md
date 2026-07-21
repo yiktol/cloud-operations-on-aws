@@ -2,12 +2,28 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
+- Module 11 CloudFormation stack deployed (`Mod-11/cfn-setup.yaml`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
-(Minimal setup — we build the VPC live for educational value)
+### Deploy the CloudFormation stack
+The stack creates: IAM role for VPC Flow Logs to publish to CloudWatch Logs.
+
+```bash
+aws cloudformation deploy \
+  --template-file Mod-11/cfn-setup.yaml \
+  --stack-name mod11-demo \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+### Get the Flow Logs role ARN
+```bash
+FLOW_LOG_ROLE_ARN=$(aws cloudformation describe-stacks --stack-name mod11-demo --query "Stacks[0].Outputs[?OutputKey=='FlowLogsRoleArn'].OutputValue" --output text)
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+REGION=$(aws configure get region)
+```
 
 ---
 
@@ -114,9 +130,6 @@ aws ec2 describe-network-acls --network-acl-ids ${NACL_ID} \
 # Create a CloudWatch log group for flow logs
 aws logs create-log-group --log-group-name "/demo/vpc-flow-logs"
 
-# Create a flow log role (simplified)
-FLOW_LOG_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/VPCFlowLogsRole"
-
 # Enable VPC Flow Logs
 FLOW_LOG_ID=$(aws ec2 create-flow-log \
   --resource-type VPC \
@@ -125,7 +138,7 @@ FLOW_LOG_ID=$(aws ec2 create-flow-log \
   --log-destination-type cloud-watch-logs \
   --log-group-name "/demo/vpc-flow-logs" \
   --deliver-logs-permission-arn ${FLOW_LOG_ROLE_ARN} \
-  --query 'FlowLogIds[0]' --output text 2>/dev/null) || echo "Note: Flow log role needs to be pre-created"
+  --query 'FlowLogIds[0]' --output text)
 
 echo "Flow Logs enabled! All traffic (ACCEPT + REJECT) is now recorded."
 
@@ -133,7 +146,6 @@ echo "Flow Logs enabled! All traffic (ACCEPT + REJECT) is now recorded."
 echo "
 Sample flow log entry:
 2 123456789012 eni-abc123 10.0.1.5 203.0.113.12 443 49152 6 25 20000 1620140661 1620140721 ACCEPT OK
-|  |           |          |src     |dst          |dp |sp    |T |pkt|bytes|start      |end        |action
 
 Fields: version account-id interface src-addr dst-addr dst-port src-port protocol packets bytes start end action log-status
 "
@@ -156,7 +168,7 @@ aws logs filter-log-events \
 
 ```bash
 # Delete flow log
-aws ec2 delete-flow-logs --flow-log-ids ${FLOW_LOG_ID} 2>/dev/null
+aws ec2 delete-flow-logs --flow-log-ids ${FLOW_LOG_ID}
 
 # Delete NACL
 aws ec2 delete-network-acl --network-acl-id ${NACL_ID}
@@ -180,6 +192,9 @@ aws ec2 delete-vpc --vpc-id ${VPC_ID}
 
 # Delete log group
 aws logs delete-log-group --log-group-name "/demo/vpc-flow-logs"
+
+# Delete the stack
+aws cloudformation delete-stack --stack-name mod11-demo
 ```
 
 ---

@@ -2,93 +2,26 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- A text editor to show the template
+- Module 05 CloudFormation stack deployed (`Mod-05/cfn-setup.yaml`) — creates an S3 bucket for templates
+- The `webapp-stack.yaml` template file (included in `Mod-05/`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
-### Create the CloudFormation template
+### Deploy the setup stack
+The stack creates an S3 bucket for storing demo templates.
 
-**Save as `webapp-stack.yaml`:**
-```yaml
-AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Demo - Web application stack with VPC and EC2'
+```bash
+aws cloudformation deploy \
+  --template-file Mod-05/cfn-setup.yaml \
+  --stack-name mod05-demo \
+  --capabilities CAPABILITY_NAMED_IAM
+```
 
-Parameters:
-  EnvironmentType:
-    Type: String
-    Default: Development
-    AllowedValues:
-      - Development
-      - Production
-    Description: Select environment type
-
-Conditions:
-  IsProduction: !Equals [!Ref EnvironmentType, Production]
-
-Mappings:
-  InstanceTypeMap:
-    Development:
-      InstanceType: t3.micro
-    Production:
-      InstanceType: t3.small
-
-Resources:
-  DemoVPC:
-    Type: AWS::EC2::VPC
-    Properties:
-      CidrBlock: 10.0.0.0/16
-      EnableDnsHostnames: true
-      Tags:
-        - Key: Name
-          Value: !Sub '${EnvironmentType}-VPC'
-
-  DemoSubnet:
-    Type: AWS::EC2::Subnet
-    Properties:
-      VpcId: !Ref DemoVPC
-      CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [0, !GetAZs '']
-      Tags:
-        - Key: Name
-          Value: !Sub '${EnvironmentType}-Subnet'
-
-  DemoSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Allow HTTP
-      VpcId: !Ref DemoVPC
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 80
-          ToPort: 80
-          CidrIp: 0.0.0.0/0
-
-  DemoInstance:
-    Type: AWS::EC2::Instance
-    Properties:
-      ImageId: resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
-      InstanceType: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
-      SubnetId: !Ref DemoSubnet
-      SecurityGroupIds:
-        - !Ref DemoSecurityGroup
-      Tags:
-        - Key: Name
-          Value: !Sub '${EnvironmentType}-WebServer'
-        - Key: Environment
-          Value: !Ref EnvironmentType
-
-Outputs:
-  VPCId:
-    Value: !Ref DemoVPC
-    Description: VPC ID
-  InstanceId:
-    Value: !Ref DemoInstance
-    Description: EC2 Instance ID
-  InstanceType:
-    Value: !FindInMap [InstanceTypeMap, !Ref EnvironmentType, InstanceType]
-    Description: Instance type deployed
+### Get the template bucket name
+```bash
+TEMPLATE_BUCKET=$(aws cloudformation describe-stacks --stack-name mod05-demo --query "Stacks[0].Outputs[?OutputKey=='TemplateBucketName'].OutputValue" --output text)
 ```
 
 ---
@@ -101,15 +34,15 @@ Outputs:
 
 ```bash
 # Show the template (highlight Parameters, Mappings, Resources, Outputs)
-cat webapp-stack.yaml
+cat Mod-05/webapp-stack.yaml
 
 # Validate the template
-aws cloudformation validate-template --template-body file://webapp-stack.yaml
+aws cloudformation validate-template --template-body file://Mod-05/webapp-stack.yaml
 
 # Deploy as Development
 aws cloudformation create-stack \
   --stack-name demo-webapp-dev \
-  --template-body file://webapp-stack.yaml \
+  --template-body file://Mod-05/webapp-stack.yaml \
   --parameters ParameterKey=EnvironmentType,ParameterValue=Development
 
 # Watch the stack creation events in real-time
@@ -185,11 +118,11 @@ aws cloudformation describe-change-set \
 ## Part 3: Cleanup
 
 ```bash
-# Delete the stack (removes ALL resources it created)
+# Delete the demo webapp stack
 aws cloudformation delete-stack --stack-name demo-webapp-dev
 
-# Verify deletion
-aws cloudformation describe-stacks --stack-name demo-webapp-dev 2>&1 || echo "Stack deleted!"
+# Delete the setup stack
+aws cloudformation delete-stack --stack-name mod05-demo
 ```
 
 ---

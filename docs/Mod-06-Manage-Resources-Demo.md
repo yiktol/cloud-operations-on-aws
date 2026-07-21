@@ -2,16 +2,28 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- At least one EC2 instance with SSM Agent running
-- Instance must have `AmazonSSMManagedInstanceCore` IAM role
+- Module 06 CloudFormation stack deployed (`Mod-06/cfn-setup.yaml`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
+### Deploy the CloudFormation stack
+The stack creates: EC2 instance with SSM access, tagged with Environment=Production and PatchGroup=Production-Linux.
+
 ```bash
-# Use an existing managed instance or launch one (see Module 03 setup)
-INSTANCE_ID="i-XXXXXXXXXXXX"
+aws cloudformation deploy \
+  --template-file Mod-06/cfn-setup.yaml \
+  --stack-name mod06-demo \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    SubnetId=<your-subnet-id> \
+    VpcId=<your-vpc-id>
+```
+
+### Get the instance ID for the demo
+```bash
+INSTANCE_ID=$(aws cloudformation describe-stacks --stack-name mod06-demo --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
 
 # Verify it's managed
 aws ssm describe-instance-information \
@@ -159,6 +171,9 @@ aws ssm delete-maintenance-window --window-id ${WINDOW_ID}
 
 # Delete parameters
 aws ssm delete-parameters --names "/demo/app/config/endpoint" "/demo/app/secrets/db-password"
+
+# Delete the stack
+aws cloudformation delete-stack --stack-name mod06-demo
 ```
 
 ---

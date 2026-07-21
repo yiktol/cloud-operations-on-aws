@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'Module 03 Demo Setup - System Discovery (Session Manager, SSM Inventory, AWS Config)'
+Description: 'Module 03 Demo Setup - System Discovery (Session Manager, SSM Inventory, AWS Config Rules)'
 
 Parameters:
   SubnetId:
@@ -57,40 +57,47 @@ Resources:
         - Key: Environment
           Value: Demo
 
-  ConfigBucket:
-    Type: AWS::S3::Bucket
+  # SSM Inventory Association — collects software, network, OS info every 30 minutes
+  InventoryAssociation:
+    Type: AWS::SSM::Association
     Properties:
-      BucketName: !Sub 'config-demo-${AWS::AccountId}'
+      Name: AWS-GatherSoftwareInventory
+      Targets:
+        - Key: InstanceIds
+          Values:
+            - !Ref DemoInstance
+      ScheduleExpression: "rate(30 minutes)"
+      Parameters:
+        applications: ["Enabled"]
+        awsComponents: ["Enabled"]
+        networkConfig: ["Enabled"]
+        services: ["Enabled"]
 
-  ConfigBucketPolicy:
-    Type: AWS::S3::BucketPolicy
+  # Config Rules — assumes AWS Config recorder is already enabled
+  ConfigRuleSSMManaged:
+    Type: AWS::Config::ConfigRule
     Properties:
-      Bucket: !Ref ConfigBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AWSConfigBucketPermissionsCheck
-            Effect: Allow
-            Principal:
-              Service: config.amazonaws.com
-            Action: s3:GetBucketAcl
-            Resource: !GetAtt ConfigBucket.Arn
-            Condition:
-              StringEquals:
-                AWS:SourceAccount: !Ref AWS::AccountId
-          - Sid: AWSConfigBucketDelivery
-            Effect: Allow
-            Principal:
-              Service: config.amazonaws.com
-            Action: s3:PutObject
-            Resource: !Sub '${ConfigBucket.Arn}/AWSLogs/${AWS::AccountId}/Config/*'
-            Condition:
-              StringEquals:
-                s3:x-amz-acl: bucket-owner-full-control
-                AWS:SourceAccount: !Ref AWS::AccountId
+      ConfigRuleName: ec2-instance-managed-by-systems-manager
+      Description: EC2 instances must be managed by Systems Manager
+      Scope:
+        ComplianceResourceTypes:
+          - AWS::EC2::Instance
+      Source:
+        Owner: AWS
+        SourceIdentifier: EC2_INSTANCE_MANAGED_BY_SSM
+
+  ConfigRuleNoPublicIP:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: ec2-instance-no-public-ip
+      Description: EC2 instances should not have public IPs
+      Scope:
+        ComplianceResourceTypes:
+          - AWS::EC2::Instance
+      Source:
+        Owner: AWS
+        SourceIdentifier: EC2_INSTANCE_NO_PUBLIC_IP
 
 Outputs:
   InstanceId:
     Value: !Ref DemoInstance
-  ConfigBucketName:
-    Value: !Ref ConfigBucket

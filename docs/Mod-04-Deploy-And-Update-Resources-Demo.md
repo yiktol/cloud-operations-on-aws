@@ -2,24 +2,28 @@
 
 ## Prerequisites
 - AWS CLI configured with admin credentials
-- An existing EC2 instance (Amazon Linux 2023)
+- Module 04 CloudFormation stack deployed (`Mod-04/cfn-setup.yaml`)
 
 ---
 
 ## Part 1: Setup (do before class)
 
-### Step 1: Launch a base EC2 instance
+### Deploy the CloudFormation stack
+The stack creates: EC2 instance (Amazon Linux 2023) with SSM access, tagged with Name/Environment/CostCenter.
 
 ```bash
-# Launch a basic instance to use for AMI creation
-aws ec2 run-instances \
-  --image-id resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64 \
-  --instance-type t3.micro \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=WebServer-Base},{Key=Environment,Value=Development},{Key=CostCenter,Value=CC1234}]' \
-  --count 1
+aws cloudformation deploy \
+  --template-file Mod-04/cfn-setup.yaml \
+  --stack-name mod04-demo \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides \
+    SubnetId=<your-subnet-id> \
+    VpcId=<your-vpc-id>
+```
 
-# Note the instance ID
-INSTANCE_ID="i-XXXXXXXXXXXX"
+### Get the instance ID for the demo
+```bash
+INSTANCE_ID=$(aws cloudformation describe-stacks --stack-name mod04-demo --query "Stacks[0].Outputs[?OutputKey=='InstanceId'].OutputValue" --output text)
 ```
 
 ---
@@ -137,8 +141,7 @@ aws ssm send-command \
 ## Part 3: Cleanup
 
 ```bash
-# Terminate instances
-aws ec2 terminate-instances --instance-ids ${INSTANCE_ID}
+# Terminate instances launched from the AMI
 aws ec2 terminate-instances --instance-ids $(aws ec2 describe-instances \
   --filters "Name=tag:DeployedFrom,Values=${AMI_ID}" \
   --query 'Reservations[*].Instances[*].InstanceId' --output text)
@@ -151,6 +154,9 @@ aws ec2 delete-snapshot --snapshot-id ${SNAPSHOT_ID}
 
 # Delete resource group
 aws resource-groups delete-group --group-name "Dev-Environment"
+
+# Delete the stack (removes base instance, IAM role, security group)
+aws cloudformation delete-stack --stack-name mod04-demo
 ```
 
 ---
