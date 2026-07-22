@@ -858,9 +858,26 @@
                 <div class="architecture-content">
                   <p class="description">Inter-region VPC Peering connections enabling secure, direct network connectivity between VPCs across Singapore, Sydney, and Mumbai regions, facilitating cross-region communication without traversing the public internet while maintaining network isolation.</p>
                   <ul class="demo-links">
-                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-0f9d59bbe6285e7d0?region=ap-southeast-1" target="_blank" class="demo-button">Singapore</a></li>
-                    <li><a href="https://ap-south-1.console.aws.amazon.com/systems-manager/session-manager/i-012c4d66016d5f4b3?region=ap-south-1" target="_blank" class="demo-button">Mumbai</a></li>
-                    <li><a href="https://ap-southeast-2.console.aws.amazon.com/systems-manager/session-manager/i-0bb11cc16b7aa0449?region=ap-southeast-2" target="_blank" class="demo-button">Sydney</a></li>
+                    <li><a href="#" onclick="openSessionManager('ap-southeast-1', 'Singapore')" class="demo-button">Singapore</a></li>
+                    <li><a href="#" onclick="openSessionManager('ap-south-1', 'Mumbai')" class="demo-button">Mumbai</a></li>
+                    <li><a href="#" onclick="openSessionManager('ap-southeast-2', 'Sydney')" class="demo-button">Sydney</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- ELB Comparison -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">08</div>
+                  <h3 class="architecture-title">ELB Comparison — ALB vs NLB vs GLB</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/elb_comparison.png" alt="ELB Comparison" class="diagram-image" data-full="img/elb_comparison.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Side-by-side comparison of Elastic Load Balancing types — Application Load Balancer (Layer 7), Network Load Balancer (Layer 4), and Gateway Load Balancer (transparent inspection) — demonstrating use cases, routing behavior, and performance characteristics.</p>
+                  <ul class="demo-links">
+                    <li><a href="#" onclick="openSessionManager('ap-southeast-1', 'ELB Comparison')" class="demo-button">Session Manager</a></li>
                   </ul>
                 </div>
               </div>
@@ -956,12 +973,29 @@
                   <h3 class="architecture-title">AWS X-Ray and Microservices</h3>
                 </div>
                 <div class="architecture-image">
-                  <img src="img/microservices.png" alt="AWS X-Ray and Microservices" class="diagram-image" data-full="img/microservices.png">
+                  <img src="img/xray.png" alt="AWS X-Ray and Microservices" class="diagram-image" data-full="img/xray.png">
                 </div>
                 <div class="architecture-content">
                   <p class="description">Distributed tracing implementation using AWS X-Ray for microservices observability, providing end-to-end request tracking, performance bottleneck identification, and service dependency mapping across complex distributed application architectures.</p>
                   <ul class="demo-links">
                     <li><a href="https://x-ray.aws.yikyakyuk.com" target="_blank" class="demo-button">AWS X-Ray and Microservices</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Serverless Microservice -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">13</div>
+                  <h3 class="architecture-title">Serverless Microservice</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/serverless_microservice.png" alt="Serverless Microservice" class="diagram-image" data-full="img/serverless_microservice.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Serverless microservice architecture with API Gateway, Lambda functions, and DynamoDB for a fully managed inventory API. Deployed as an ECS Fargate service behind CloudFront and ALB with path-based routing, demonstrating containerized serverless patterns with zero server management.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://demo.aws.yikyakyuk.com/serverless-microservice/" target="_blank" class="demo-button">Serverless Microservice</a></li>
                   </ul>
                 </div>
               </div>
@@ -1022,6 +1056,24 @@
                   <ul class="demo-links">
                     <li><a href="https://demo.aws.yikyakyuk.com/kms-app/" target="_blank" class="demo-button">Policy Interpretation</a></li>
                     <li><a href="https://demo.aws.yikyakyuk.com/kms-app-2/" target="_blank" class="demo-button">Encrypt/Decrypt</a></li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Event-Driven Incident Response -->
+              <div class="architecture-item">
+                <div class="architecture-header">
+                  <div class="architecture-number">16</div>
+                  <h3 class="architecture-title">Event-Driven Incident Response</h3>
+                </div>
+                <div class="architecture-image">
+                  <img src="img/event_driven_remediation.png" alt="Event-Driven Incident Response" class="diagram-image" data-full="img/event_driven_remediation.png">
+                </div>
+                <div class="architecture-content">
+                  <p class="description">Automated security incident response using EventBridge to detect CloudTrail StopLogging events, triggering a Lambda function that investigates the incident, automatically re-enables logging, and creates an OpsCenter OpsItem with full incident details for the response analyst.</p>
+                  <ul class="demo-links">
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/opsitems?region=ap-southeast-1" target="_blank" class="demo-button">OpsCenter</a></li>
+                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/cloudtrail/home?region=ap-southeast-1" target="_blank" class="demo-button">CloudTrail</a></li>
                   </ul>
                 </div>
               </div>
@@ -1089,7 +1141,7 @@
                 <div class="architecture-content">
                   <p class="description">Automate the creation, retention, copy and deletion of snapshots and AMIs. Amazon Data Lifecycle Manager provides a simple, automated way to back up data stored on Amazon EBS volumes.</p>
                   <ul class="demo-links">
-                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-094140c9de77522bb?region=ap-southeast-1" target="_blank" class="demo-button">DLM-EC2-Instance</a></li>
+                    <li><a href="#" onclick="openSessionManager('ap-southeast-1', 'DLM EC2 Instance')" class="demo-button">DLM-EC2-Instance</a></li>
                   </ul>
                 </div>
               </div>
@@ -1141,7 +1193,7 @@
                 <div class="architecture-content">
                   <p class="description">Amazon Elastic File System (EFS) implementation providing scalable, shared NFS storage accessible across multiple EC2 instances and availability zones, demonstrating concurrent access patterns and automatic scaling capabilities for distributed workloads.</p>
                   <ul class="demo-links">
-                    <li><a href="https://ap-southeast-1.console.aws.amazon.com/systems-manager/session-manager/i-0d9acdd6758208e7b?region=ap-southeast-1" target="_blank" class="demo-button">Ubuntu-EFS-Instance</a></li>
+                    <li><a href="#" onclick="openSessionManager('ap-southeast-1', 'Ubuntu EFS Instance')" class="demo-button">Ubuntu-EFS-Instance</a></li>
                   </ul>
                 </div>
               </div>
@@ -1524,6 +1576,16 @@
         const linkContainer = document.querySelector('.demo-links-x');
         updateInstanceLinks(linkContainer, 'instances.json');
     });
+
+    function openSessionManager(region, label) {
+      region = region || 'ap-southeast-1';
+      label = label || region;
+      const instanceId = prompt(`Enter the EC2 Instance ID for ${label} (e.g., i-0abc123def456):`, '');
+      if (instanceId && instanceId.trim()) {
+        const url = `https://${region}.console.aws.amazon.com/systems-manager/session-manager/${instanceId.trim()}?region=${region}`;
+        window.open(url, '_blank');
+      }
+    }
   </script>
 </body>
 </html>
